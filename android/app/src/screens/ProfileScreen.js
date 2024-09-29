@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
+import { View, Text,TextInput, Image,TouchableOpacity,Alert, Button, StyleSheet } from 'react-native';
+import { launchImageLibrary } from "react-native-image-picker";
+
 
 const ProfileScreen = ({ navigation }) => {
     return (

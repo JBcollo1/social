@@ -1,12 +1,15 @@
 // LoginScreen.js
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet } from "react-native";
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const handleLogin = async () => {
+        setLoading(true);
         try {
             const response = await fetch("http://192.168.100.82:5000/auth/login/user", {
                 method: "POST",
@@ -17,20 +20,23 @@ const LoginScreen = ({ navigation }) => {
             });
 
             const data = await response.json();
+            setLoading(false);
 
             if (response.ok) {
-                // Handle successful login (e.g., navigate to Home)
+                await AsyncStorage.setItem('access_token', data.access_token);
                 console.log("Login successful", data);
+                navigation.navigate("Home");
             } else {
-                // Check if user exists, if not, navigate to register
                 if (data.message === "User does not exist") {
                     navigation.navigate("Register");
                 } else {
-                    console.error(data.message);
+                    Alert.alert("Login Failed", data.message || "An error occurred");
                 }
             }
         } catch (error) {
+            setLoading(false);
             console.error("Error logging in:", error);
+            Alert.alert("Login Failed", "An unexpected error occurred. Please try again.");
         }
     };
 
@@ -42,6 +48,8 @@ const LoginScreen = ({ navigation }) => {
                 placeholder="Email"
                 value={email}
                 onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
             />
             <TextInput
                 style={styles.input}
@@ -55,6 +63,7 @@ const LoginScreen = ({ navigation }) => {
                 title="Go to Register"
                 onPress={() => navigation.navigate("Register")}
             />
+            {loading && <ActivityIndicator size="large" color="#ffffff" />}
         </View>
     );
 };
@@ -64,11 +73,12 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         padding: 16,
-        backgroundColor:"black"
+        backgroundColor: "black",
     },
     title: {
         fontSize: 24,
         marginBottom: 16,
+        color: "white",
     },
     input: {
         height: 40,
@@ -76,6 +86,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         marginBottom: 12,
         paddingHorizontal: 8,
+        color: "white",
     },
 });
 
