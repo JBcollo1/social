@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Image, Button, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
+import {
+  View, Text, TextInput, Image, Button, StyleSheet,
+  Alert, TouchableOpacity, ActivityIndicator, Platform
+} from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {jwtDecode} from 'jwt-decode';  // Adjusted import statement
+import {jwtDecode} from 'jwt-decode';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Icon from 'react-native-vector-icons/Ionicons';  // Import Ionicons for the edit icon
+import RNPickerSelect from 'react-native-picker-select';
+
 
 const ProfileScreen = () => {
   const [bio, setBio] = useState('');
@@ -14,10 +20,13 @@ const ProfileScreen = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profileExists, setProfileExists] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(dateOfBirth.getFullYear());
 
   // Fetch user ID from token and decode it
   useEffect(() => {
     const fetchUserId = async () => {
+      setLoading(true);
       const access_token = await AsyncStorage.getItem("access_token");
       if (access_token) {
         try {
@@ -27,9 +36,11 @@ const ProfileScreen = () => {
           console.error("Failed to decode token:", error);
         }
       }
+      setLoading(false);
     };
     fetchUserId();
   }, []);
+  
 
   // Fetch profile details if userId is available
   useEffect(() => {
@@ -40,6 +51,7 @@ const ProfileScreen = () => {
 
   // Fetch user profile from the backend
   const fetchProfile = async (userId) => {
+    setLoading(true);  // Start loading
     try {
       const response = await fetch(`http://192.168.100.82:5000/profile/${userId}`, {
         method: "GET",
@@ -60,25 +72,33 @@ const ProfileScreen = () => {
     } catch (error) {
       setProfileExists(false);
       Alert.alert('Error', error.message || 'Failed to fetch profile.');
+    } finally {
+      setLoading(false);  // End loading
     }
   };
 
   // Open image picker to select profile picture
   const handleImagePick = () => {
-    launchImageLibrary({}, (response) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorCode) {
-        console.error('ImagePicker Error: ', response.errorMessage);
-        Alert.alert('Error', 'Failed to pick an image.');
-      } else if (response.assets && response.assets.length > 0) {
-        setProfilePicture(response.assets[0]);
-      }
-    });
+    if (isEditing) {  // Only allow image pick when editing is enabled
+      launchImageLibrary({}, (response) => {
+        if (response.didCancel) {
+          console.log('User cancelled image picker');
+        } else if (response.errorCode) {
+          console.error('ImagePicker Error: ', response.errorMessage);
+          Alert.alert('Error', 'Failed to pick an image.');
+        } else if (response.assets && response.assets.length > 0) {
+          setProfilePicture(response.assets[0]);
+        }
+      });
+    }
   };
-
+  const years = Array.from(
+    { length: new Date().getFullYear() - 1900 },
+    (_, i) => ({ label: `${new Date().getFullYear() - i}`, value: new Date().getFullYear() - i })
+  );
   // Save profile (either create or update)
   const handleSaveProfile = async () => {
+    setLoading(true);  // Start loading
     if (profileExists) {
       handleUpdateProfile();
     } else {
@@ -95,8 +115,8 @@ const ProfileScreen = () => {
     if (profilePicture) {
       formData.append('profile_picture', {
         uri: profilePicture.uri,
-        type: profilePicture.type,
-        name: profilePicture.fileName,
+        type: profilePicture.type || 'image/jpeg',  // Default to image/jpeg
+        name: profilePicture.fileName || 'profile.jpg',  // Default file name
       });
     }
 
@@ -120,6 +140,8 @@ const ProfileScreen = () => {
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to create profile.');
+    } finally {
+      setLoading(false);  // End loading
     }
   };
 
@@ -132,11 +154,11 @@ const ProfileScreen = () => {
     if (profilePicture) {
       formData.append('profile_picture', {
         uri: profilePicture.uri,
-        type: profilePicture.type,
-        name: profilePicture.fileName,
+        type: profilePicture.type || 'image/jpeg',
+        name: profilePicture.fileName || 'profile.jpg',
       });
     }
-  
+
     try {
       const response = await fetch(`http://192.168.100.82:5000/profile/${userId}`, {
         method: "PATCH",
@@ -146,85 +168,124 @@ const ProfileScreen = () => {
         },
         body: formData,
       });
-  
+
       const data = await response.json();
       if (response.ok) {
         Alert.alert('Success', 'Profile updated successfully.');
         setIsEditing(false);
         fetchProfile(userId);
       } else {
-        console.error('Update Error:', data);  // Log the error response
         Alert.alert('Error', data.message || 'Failed to update profile.');
       }
     } catch (error) {
-      console.error('Network or Server Error:', error);  // Log the full error
       Alert.alert('Error', 'Failed to update profile.');
+    } finally {
+      setLoading(false);  // End loading
     }
   };
-  
-
+  const handleYearChange = (year) => {
+    const newDate = new Date(dateOfBirth);
+    newDate.setFullYear(year);
+    setDateOfBirth(newDate);
+    setSelectedYear(year);
+  };
   // Handle date picker change
   const handleDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate || dateOfBirth;
-    setShowDatePicker(Platform.OS === 'ios');  // Keep picker open for iOS
-    setDateOfBirth(currentDate);
+    if (isEditing) {  // Only update date when editing is enabled
+      const currentDate = selectedDate || dateOfBirth;
+      setShowDatePicker(Platform.OS === 'ios');  // Keep picker open for iOS
+      setDateOfBirth(currentDate);
+    }
   };
+  const pickerSelectStyles = {
+    inputIOS: {
+      color: 'black',
+      padding: 10,
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 5,
+      marginBottom: 15,
+    },
+    inputAndroid: {
+      color: 'black',
+      padding: 10,
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 5,
+      marginBottom: 15,
+    },}
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {profilePicture && profilePicture.uri && (
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: profilePicture.uri }} style={styles.image} />
-          {profileExists && (
-            <TouchableOpacity onPress={() => setIsEditing(true)}>
-              <Text style={styles.editIcon}>✏️</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-      <Text style={styles.title}>Profile</Text>
+      
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Profile</Text>
+        <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.editIcon}>
+          <Icon name={isEditing ? "checkmark" : "pencil"} size={24} color="black" />
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.imagePicker} onPress={handleImagePick}>
+        {profilePicture ? (
+          <Image source={{ uri: profilePicture.uri }} style={styles.profileImage} />
+        ) : (
+          <Text style={styles.blackText}>Pick a Profile Picture</Text>
+        )}
+      </TouchableOpacity>
+      <TextInput
+        style={[styles.input, styles.blackText]}
+        placeholder="Bio"
+        placeholderTextColor="black"
+        value={bio}
+        onChangeText={setBio}
+        editable={isEditing}  // Make editable only when in edit mode
+      />
+      <TextInput
+        style={[styles.input, styles.blackText]}
+        placeholder="Location"
+        placeholderTextColor="black"
+        value={location}
+        onChangeText={setLocation}
+        editable={isEditing}  // Make editable only when in edit mode
+      />
+    <TouchableOpacity onPress={() => isEditing && setShowDatePicker(true)}>
+  {isEditing && ( // Conditional rendering for editing mode
+    <>
+      <Text style={styles.label}>Select Year:</Text>
+      <RNPickerSelect
+        onValueChange={(value) => handleYearChange(value)}
+        items={years}
+        value={selectedYear}
+        placeholder={{ label: 'Select Year', value: null }}
+        style={pickerSelectStyles}
+      />
+    </>
+  )}
+  
+  <Text style={[styles.dateText, styles.blackText]}>
+    Date of Birth: {dateOfBirth.toDateString()}
+  </Text>
+</TouchableOpacity>
 
-      {profileExists && !isEditing ? (
-        <View style={styles.profileDetails}>
-          <Text style={styles.detailText}>Bio: {bio}</Text>
-          <Text style={styles.detailText}>Location: {location}</Text>
-          <Text style={styles.detailText}>Date of Birth: {dateOfBirth.toISOString().split('T')[0]}</Text>
-        </View>
-      ) : (
-        <>
-          <Button title="Select Profile Picture" onPress={handleImagePick} />
-          <TextInput
-            style={styles.input}
-            placeholder="Bio"
-            value={bio}
-            onChangeText={setBio}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Location"
-            value={location}
-            onChangeText={setLocation}
-          />
+{showDatePicker && (
+  <DateTimePicker
+    value={dateOfBirth}
+    mode="date"
+    display="default"
+    onChange={handleDateChange}
+    maximumDate={new Date(new Date().getFullYear() - 1, 11, 31)}
+  />
+)}
 
-          {/* Date Picker Trigger */}
-          <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-            <Text style={styles.datePickerText}>Select Date of Birth: {dateOfBirth.toISOString().split('T')[0]}</Text>
-          </TouchableOpacity>
-
-          {/* DateTimePicker Component */}
-          {showDatePicker && (
-            <DateTimePicker
-              value={dateOfBirth}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-              maximumDate={new Date()}  // Restrict to dates up to today
-            />
-          )}
-
-          <Button title="Save Profile" onPress={handleSaveProfile} />
-        </>
-      )}
+     
+      {isEditing && <Button title="Save Profile" onPress={handleSaveProfile} />}
     </View>
   );
 };
@@ -232,53 +293,62 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: 'black',
+    padding: 20,
   },
-  title: {
-    fontSize: 24,
-    marginBottom: 16,
-    color: 'white',
-    textAlign: 'center',
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    marginBottom: 12,
-    paddingHorizontal: 8,
-    color: 'white',
-  },
-  image: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 12,
-  },
-  imageContainer: {
+  headerContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color:'black',
   },
   editIcon: {
-    fontSize: 24,
-    color: 'white',
-    marginLeft: 8,
+    padding: 10,
   },
-  profileDetails: {
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+  },
+  imagePicker: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  profileImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 80,
+    marginBottom: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  detailText: {
-    color: 'white',
+  dateText: {
     fontSize: 16,
-    marginVertical: 4,
+    marginBottom: 20,
   },
-  datePickerText: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 16,
+  blackText: {
+    color: 'black',
+  },
+  label: {
+    fontSize: 16,         // Font size
+    fontWeight: 'bold',   // Font weight
+    color: '#333',        // Text color
+    marginBottom: 8,      // Space below the label
   },
 });
 
