@@ -7,7 +7,8 @@ import Header from "../components/Header";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import VerificationScreen from "../screens/verification";
- 
+import PostCreationScreen from "../screens/PostCreationScreen"; 
+
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
@@ -20,6 +21,8 @@ const AppNavigator = () => {
                         headerShown: true,
                     }}/>
                 <Stack.Screen name="Profile" component={ProfileScreen} options={{headerTitle: () => <Header />, headerShown:true}}/>
+                <Stack.Screen name="Post" component={PostCreationScreen} options={{headerTitle: () => <Header />, headerShown:false}}/>
+
                 <Stack.Screen name="Register" component={RegisterScreen} options={{headerTitle: () => <Header />, headerShown:true}}/>
                 <Stack.Screen name="Verification" component={VerificationScreen} options={{headerTitle: () => <Header />, headerShown:true}}/>
 

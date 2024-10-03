@@ -9,7 +9,7 @@ import {jwtDecode} from 'jwt-decode';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/Ionicons';  // Import Ionicons for the edit icon
 import RNPickerSelect from 'react-native-picker-select';
-
+import { useNavigation } from '@react-navigation/native';
 
 const ProfileScreen = () => {
   const [bio, setBio] = useState('');
@@ -23,6 +23,8 @@ const ProfileScreen = () => {
   const [loading, setLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(dateOfBirth.getFullYear());
 
+
+  const navigation = useNavigation();
   // Fetch user ID from token and decode it
   useEffect(() => {
     const fetchUserId = async () => {
@@ -286,6 +288,7 @@ const ProfileScreen = () => {
 
      
       {isEditing && <Button title="Save Profile" onPress={handleSaveProfile} />}
+      <Button title="post" onPress={() => navigation.navigate('Post')} />
     </View>
   );
 };
