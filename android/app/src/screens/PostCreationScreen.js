@@ -126,7 +126,8 @@ const PostCreationScreen = () => {
                 </View>
             </TouchableOpacity>
             {photo && <Image source={{ uri: photo }} style={styles.image} />}
-            {video && <Text>{video.split('/').pop()}</Text>} {/* Ensure this is wrapped in <Text> */}
+            {video && typeof video === 'string' && <Text>{video.split('/').pop()}</Text>}
+
             <Button title="Submit Post" onPress={handlePostSubmit} />
         </View>
     );
