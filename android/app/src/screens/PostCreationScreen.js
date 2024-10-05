@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, Image, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TextInput, Button, Image, TouchableOpacity, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { jwtDecode } from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-
 
 const PostCreationScreen = () => {
     const [text, setText] = useState('');
@@ -12,9 +11,11 @@ const PostCreationScreen = () => {
     const [video, setVideo] = useState(null);
     const [userId, setUserId] = useState(null);
     const [loading, setLoading] = useState(false);
-   
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const navigation = useNavigation();
+    
     useEffect(() => {
         const fetchUserId = async () => {
             setLoading(true);
@@ -33,11 +34,11 @@ const PostCreationScreen = () => {
     }, []);
 
     const handlePostSubmit = async () => {
+        setSubmitting(true);
         const access_token = await AsyncStorage.getItem("access_token");
         const formData = new FormData();
         formData.append('content', text);
 
-        // Append photo if it exists
         if (photo) {
             formData.append('photo', {
                 uri: photo,
@@ -46,7 +47,6 @@ const PostCreationScreen = () => {
             });
         }
 
-        // Append video if it exists
         if (video) {
             formData.append('video', {
                 uri: video,
@@ -64,13 +64,20 @@ const PostCreationScreen = () => {
                 body: formData,
             });
             const result = await response.json();
-            // Handle success (e.g., navigate back, show a message)
+            console.log("Success:", result);
+            setText('');
+            setPhoto(null);
+            setVideo(null);
         } catch (error) {
             console.error("Error submitting post:", error);
         }
+        setSubmitting(false);
     };
 
     const pickImage = async () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+
         const options = {
             mediaType: 'photo',
             includeBase64: false,
@@ -85,10 +92,14 @@ const PostCreationScreen = () => {
             } else if (response.assets) {
                 setPhoto(response.assets[0].uri);
             }
+            setIsProcessing(false);
         });
     };
 
     const pickVideo = async () => {
+        if (isProcessing) return;
+        setIsProcessing(true);
+
         const options = {
             mediaType: 'video',
             includeBase64: false,
@@ -103,36 +114,44 @@ const PostCreationScreen = () => {
             } else if (response.assets) {
                 setVideo(response.assets[0].uri);
             }
+            setIsProcessing(false);
         });
     };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0000ff" />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
             <TextInput
                 style={styles.input}
                 placeholder="What's on your mind?"
+                placeholderTextColor="#888"
                 multiline
                 value={text}
                 onChangeText={setText}
             />
-            <TouchableOpacity onPress={pickImage}>
-                <View style={styles.button}>
-                    <Button title="Pick an image" />
-                </View>
+            <TouchableOpacity onPress={pickImage} style={styles.customButton}>
+                <Text style={styles.buttonText}>Pick an image</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={pickVideo}>
-                <View style={styles.button}>
-                    <Button title="Pick a video" />
-                </View>
+            <TouchableOpacity onPress={pickVideo} style={styles.customButton}>
+                <Text style={styles.buttonText}>Pick a video</Text>
             </TouchableOpacity>
             {photo && <Image source={{ uri: photo }} style={styles.image} />}
             {video && typeof video === 'string' && <Text>{video.split('/').pop()}</Text>}
 
-            <Button title="Submit Post" onPress={handlePostSubmit} />
+            {submitting ? (
+                <ActivityIndicator size="small" color="#0000ff" />
+            ) : (
+                <Button title="Submit Post" onPress={handlePostSubmit} />
+            )}
         </View>
     );
-    
-    
 };
 
 const styles = StyleSheet.create({
@@ -146,14 +165,28 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         marginBottom: 12,
         padding: 8,
+        color: 'black',  // Set text color to black
     },
-    button: {
+    customButton: {
+        backgroundColor: '#2196F3',
+        padding: 10,
+        borderRadius: 5,
         marginBottom: 12,
+        alignItems: 'center',
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 16,
     },
     image: {
         width: '100%',
         height: 200,
         marginVertical: 8,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 
