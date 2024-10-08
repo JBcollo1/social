@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, Image, TouchableOpacity, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, TextInput, Button, Image, TouchableOpacity, StyleSheet, Text, ActivityIndicator, Alert } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import {jwtDecode} from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
@@ -34,11 +34,18 @@ const PostCreationScreen = () => {
     }, []);
 
     const handlePostSubmit = async () => {
+        // Prevent post submission if neither photo nor video is selected
+        if (!photo && !video) {
+            Alert.alert("Validation Error", "You must select at least a photo or a video to post.");
+            return;
+        }
+
         setSubmitting(true);
         const access_token = await AsyncStorage.getItem("access_token");
         const formData = new FormData();
         formData.append('content', text);
 
+        // Append photo if it exists
         if (photo) {
             formData.append('photo', {
                 uri: photo,
@@ -47,6 +54,7 @@ const PostCreationScreen = () => {
             });
         }
 
+        // Append video if it exists
         if (video) {
             formData.append('video', {
                 uri: video,
@@ -148,7 +156,11 @@ const PostCreationScreen = () => {
             {submitting ? (
                 <ActivityIndicator size="small" color="#0000ff" />
             ) : (
-                <Button title="Submit Post" onPress={handlePostSubmit} />
+                <Button 
+                    title="Submit Post" 
+                    onPress={handlePostSubmit} 
+                    disabled={!photo && !video || submitting}  // Disable if no media is selected or submitting
+                />
             )}
         </View>
     );
@@ -165,7 +177,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         marginBottom: 12,
         padding: 8,
-        color: 'black',  // Set text color to black
+        color: 'black',
     },
     customButton: {
         backgroundColor: '#2196F3',

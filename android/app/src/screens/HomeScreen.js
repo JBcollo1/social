@@ -4,7 +4,7 @@ import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useNavigation } from '@react-navigation/native'; // Import navigation hook
-import {jwtDecode} from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode'; // Fix: Correct the import of jwtDecode
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,10 +17,12 @@ const HomeScreen = () => {
   const [profilePicture, setProfilePicture] = useState(null);
   const [userId, setUserId] = useState(null);
   const [profileExists, setProfileExists] = useState(true);
+  const [hasNextPage, setHasNextPage] = useState(true);
 
   const navigation = useNavigation(); // Initialize navigation
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
 
+  // Fetch user ID from token
   useEffect(() => {
     const fetchUserId = async () => {
       setLoading(true);
@@ -38,14 +40,16 @@ const HomeScreen = () => {
     fetchUserId();
   }, []);
 
+  // Fetch profile once userId is available
   useEffect(() => {
     if (userId) {
       fetchProfile(userId);
     }
   }, [userId]);
 
+  // Fetch user profile
   const fetchProfile = async (userId) => {
-    setLoading(true);  // Start loading
+    setLoading(true);
     try {
       const response = await fetch(`http://192.168.100.82:5000/profile/${userId}`, {
         method: "GET",
@@ -64,15 +68,18 @@ const HomeScreen = () => {
       setProfileExists(false);
       Alert.alert('Error', error.message || 'Failed to fetch profile.');
     } finally {
-      setLoading(false);  // End loading
+      setLoading(false);
     }
   };
 
+  // Fetch posts on page change
   useEffect(() => {
     fetchPosts(page);
   }, [page]);
 
+  // Fetch posts with pagination
   const fetchPosts = async (currentPage) => {
+    if (!hasNextPage) return; // Stop fetching if no more pages
     setLoading(true);
     const access_token = await AsyncStorage.getItem('access_token');
     try {
@@ -84,12 +91,14 @@ const HomeScreen = () => {
       });
       const result = await response.json();
       setPosts((prevPosts) => [...prevPosts, ...result.posts]); // Append new posts
+      setHasNextPage(result.has_next_page); // Update if more pages exist
     } catch (error) {
       console.error('Error fetching posts:', error);
     }
     setLoading(false);
   };
 
+  // Handle visible video
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
       const visibleIndex = viewableItems[0].index;
@@ -98,68 +107,73 @@ const HomeScreen = () => {
     }
   }).current;
 
+  // Toggle play/pause on video press
   const handleVideoPress = (index) => {
     setVideoPaused((prev) => ({ ...prev, [index]: !prev[index] })); // Toggle play/pause on tap
   };
 
+  // Render each post
   const renderPost = ({ item, index }) => {
     const isPlaying = index === playingVideoIndex; // Only play video if it matches the playing index
     const paused = videoPaused[index] || !isPlaying; // Respect the manual paused state
 
     return (
-      <TouchableOpacity style={styles.postContainer} activeOpacity={1} onPress={() => handleVideoPress(index)}>
-        {item.video_url ? (
-          <Video
-            source={{ uri: item.video_url }}
-            style={styles.video}
-            paused={paused} // Use paused state to control playback
-            repeat={true}
-            resizeMode="cover"
-            ignoreSilentSwitch="obey"
-            onError={() => console.error('Error loading video at index:', index)}
-          />
-        )  : item.photo_url ? (
-            <Image
-              source={{ uri: item.photo_url }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.text}>No Video or Photo Available</Text>
-          )}
-        
-        <View style={styles.overlay}>
-          {/* Profile picture and navigation */}
+      <View style={styles.postContainer}>
+        {/* Profile info, username, and post meta */}
+        <View style={styles.postHeader}>
           <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
             <Image
-              source={profilePicture ? { uri: profilePicture.uri } : require}
+              source={ { uri: item.user_profile_picture } } // Use the profile picture for each post
               style={styles.profilePicture}
             />
           </TouchableOpacity>
-          
-          <View style={styles.rightIcons}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Icon name="heart" size={30} color="white" />
-              <Text style={styles.iconText}>Like</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Icon name="comment" size={30} color="white" />
-              <Text style={styles.iconText}>Comment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Icon name="share" size={30} color="white" />
-              <Text style={styles.iconText}>Share</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.username}>{item.username}</Text>
         </View>
-      </TouchableOpacity>
+
+        {/* Media content */}
+        <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
+          {item.video_url ? (
+            <Video
+              source={{ uri: item.video_url }}
+              style={styles.video}
+              paused={paused}
+              repeat={true}
+              resizeMode="cover"
+              ignoreSilentSwitch="obey"
+              onError={() => console.error('Error loading video at index:', index)}
+            />
+          ) : item.photo_url ? (
+            <Image source={{ uri: item.photo_url }} style={styles.image} resizeMode="cover" />
+          ) : (
+            <Text style={styles.text}>No Video or Photo Available</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Interaction icons (like, comment, share) */}
+        <View style={styles.interactionRow}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Icon name="heart-o" size={30} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Icon name="comment-o" size={30} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Icon name="share-square-o" size={30} color="black" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Caption or description */}
+        <Text style={styles.caption}>
+          <Text style={styles.username}>{item.username}</Text> {item.caption}
+        </Text>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
       {loading ? (
-        <ActivityIndicator size="large" color="#ffffff" style={styles.loading} />
+        <ActivityIndicator size="large" color="#000" style={styles.loading} />
       ) : (
         <FlatList
           data={posts}
@@ -186,53 +200,54 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   postContainer: {
     width: width,
     height: height,
-    justifyContent: 'center',
+    backgroundColor: '#fff',
+    marginBottom: 10,
+  },
+  postHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000',
+    padding: 10,
+  },
+  profilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  username: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#000',
   },
   video: {
     width: width,
-    height: height,
-    position: 'absolute',
-    top: 0,
-    left: 0,
+    height: height * 0.6,
   },
-  profilePicture: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginBottom: 20,
+  image: {
+    width: width,
+    height: height * 0.6,
   },
-  overlay: {
-    position: 'absolute',
-    bottom: 50,
-    left: 20,
-    right: 20,
+  interactionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  text: {
-    color: 'white',
-    fontSize: 16,
-    flex: 1,
-  },
-  rightIcons: {
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    padding: 10,
   },
   iconButton: {
-    marginBottom: 20,
-    alignItems: 'center',
+    marginRight: 20,
   },
-  iconText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 4,
+  caption: {
+    paddingHorizontal: 10,
+    color: '#000',
+  },
+  text: {
+    color: 'black',
+    fontSize: 16,
+    textAlign: 'center',
   },
   loading: {
     position: 'absolute',
