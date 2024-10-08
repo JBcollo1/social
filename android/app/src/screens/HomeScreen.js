@@ -1,24 +1,77 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
-import Video from 'react-native-video'; // For rendering videos
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
+import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { useNavigation } from '@react-navigation/native'; // Import navigation hook
+import {jwtDecode} from 'jwt-decode';
 
-const { width, height } = Dimensions.get('window'); // Get screen dimensions
+const { width, height } = Dimensions.get('window');
 
 const HomeScreen = () => {
-  // State variables for managing posts, loading state, and pagination
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [paused, setPaused] = useState(true);
+  const [playingVideoIndex, setPlayingVideoIndex] = useState(null); // Track which video is playing
+  const [videoPaused, setVideoPaused] = useState({}); // Track paused state per video
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [profileExists, setProfileExists] = useState(true);
 
-  // Fetch posts when the component mounts or the page changes
+  const navigation = useNavigation(); // Initialize navigation
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      setLoading(true);
+      const access_token = await AsyncStorage.getItem("access_token");
+      if (access_token) {
+        try {
+          const decodedToken = jwtDecode(access_token);
+          setUserId(decodedToken.sub?.id || decodedToken.id);
+        } catch (error) {
+          console.error("Failed to decode token:", error);
+        }
+      }
+      setLoading(false);
+    };
+    fetchUserId();
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      fetchProfile(userId);
+    }
+  }, [userId]);
+
+  const fetchProfile = async (userId) => {
+    setLoading(true);  // Start loading
+    try {
+      const response = await fetch(`http://192.168.100.82:5000/profile/${userId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${await AsyncStorage.getItem('access_token')}`,
+        },
+      });
+      if (!response.ok) {
+        setProfileExists(false);  // No profile found
+        return;
+      }
+      const data = await response.json();
+      setProfilePicture({ uri: data.profile_picture });
+      setProfileExists(true);  // Profile found
+    } catch (error) {
+      setProfileExists(false);
+      Alert.alert('Error', error.message || 'Failed to fetch profile.');
+    } finally {
+      setLoading(false);  // End loading
+    }
+  };
+
   useEffect(() => {
     fetchPosts(page);
   }, [page]);
 
-  // Function to fetch posts from the backend server
   const fetchPosts = async (currentPage) => {
     setLoading(true);
     const access_token = await AsyncStorage.getItem('access_token');
@@ -37,45 +90,64 @@ const HomeScreen = () => {
     setLoading(false);
   };
 
-  // Render each individual post item in the list
-  const renderPost = ({ item }) => {
-     // Initial video state as paused
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      const visibleIndex = viewableItems[0].index;
+      setPlayingVideoIndex(visibleIndex);
+      setVideoPaused((prev) => ({ ...prev, [visibleIndex]: false })); // Reset paused state for the visible video
+    }
+  }).current;
 
-    // Function to toggle play/pause state of the video
-    const togglePlayPause = () => {
-      setPaused(!paused);
-    };
+  const handleVideoPress = (index) => {
+    setVideoPaused((prev) => ({ ...prev, [index]: !prev[index] })); // Toggle play/pause on tap
+  };
+
+  const renderPost = ({ item, index }) => {
+    const isPlaying = index === playingVideoIndex; // Only play video if it matches the playing index
+    const paused = videoPaused[index] || !isPlaying; // Respect the manual paused state
 
     return (
-      <TouchableOpacity style={styles.postContainer} activeOpacity={1} onPress={togglePlayPause}>
-        {/* Render video if available */}
+      <TouchableOpacity style={styles.postContainer} activeOpacity={1} onPress={() => handleVideoPress(index)}>
         {item.video_url ? (
           <Video
             source={{ uri: item.video_url }}
-            style={styles.video} // Fullscreen video styling
-            paused={paused} // Toggle play/pause state
-            repeat={true} // Repeat video like TikTok
-            resizeMode='cover' // Cover entire screen
-            ignoreSilentSwitch='obey' // Obey device silent switch
+            style={styles.video}
+            paused={paused} // Use paused state to control playback
+            repeat={true}
+            resizeMode="cover"
+            ignoreSilentSwitch="obey"
+            onError={() => console.error('Error loading video at index:', index)}
           />
-        ) : (
-          // If no video, display a text message
-          <Text style={styles.text}>No Video Available</Text>
-        )}
-        {/* Overlay with post content and interaction icons */}
+        )  : item.photo_url ? (
+            <Image
+              source={{ uri: item.photo_url }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.text}>No Video or Photo Available</Text>
+          )}
+        
         <View style={styles.overlay}>
-          <Text style={styles.text}>{item.content || 'No description'}</Text>
+          {/* Profile picture and navigation */}
+          <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
+            <Image
+              source={profilePicture ? { uri: profilePicture.uri } : require}
+              style={styles.profilePicture}
+            />
+          </TouchableOpacity>
+          
           <View style={styles.rightIcons}>
             <TouchableOpacity style={styles.iconButton}>
-              <Icon name='heart' size={30} color='white' />
+              <Icon name="heart" size={30} color="white" />
               <Text style={styles.iconText}>Like</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
-              <Icon name='comment' size={30} color='white' />
+              <Icon name="comment" size={30} color="white" />
               <Text style={styles.iconText}>Comment</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
-              <Icon name='share' size={30} color='white' />
+              <Icon name="share" size={30} color="white" />
               <Text style={styles.iconText}>Share</Text>
             </TouchableOpacity>
           </View>
@@ -86,50 +158,55 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Display loading indicator while posts are being fetched */}
       {loading ? (
-        <ActivityIndicator size='large' color='#ffffff' style={styles.loading} />
+        <ActivityIndicator size="large" color="#ffffff" style={styles.loading} />
       ) : (
-        // FlatList for rendering the list of posts
         <FlatList
           data={posts}
           renderItem={renderPost}
-          keyExtractor={(item) => item.id.toString()} // Use post ID as the unique key
-          pagingEnabled={true} // Enable paging for smooth scrolling
-          snapToAlignment='start' // Align to start for snap effect
-          snapToInterval={height} // Snap interval equal to screen height
-          decelerationRate='fast' // Fast deceleration for smooth snapping
-          showsVerticalScrollIndicator={false} // Hide vertical scroll indicator
-          scrollEnabled={true} // Enable scrolling
-          contentContainerStyle={{ flexGrow: 1 }} // Flex grow to occupy the full height
-          getItemLayout={(data, index) => ({ length: height, offset: height * index, index })} // Precompute item layout
-          onEndReached={() => setPage((prevPage) => prevPage + 1)} // Load more posts when reaching the end
-          onEndReachedThreshold={0.5} // Trigger onEndReached when 50% away from bottom
+          keyExtractor={(item) => item.id.toString()}
+          pagingEnabled={true}
+          snapToAlignment="start"
+          snapToInterval={height}
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          contentContainerStyle={{ flexGrow: 1 }}
+          getItemLayout={(data, index) => ({ length: height, offset: height * index, index })}
+          onEndReached={() => setPage((prevPage) => prevPage + 1)}
+          onEndReachedThreshold={0.5}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
       )}
     </View>
   );
 };
 
-// Styles for the HomeScreen component and its child elements
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000', // Black background for fullscreen video effect
+    backgroundColor: '#000',
   },
   postContainer: {
     width: width,
     height: height,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000', // Black background for fullscreen effect
+    backgroundColor: '#000',
   },
   video: {
-    width: width, // Fullscreen width
-    height: height, // Fullscreen height
-    position: 'absolute', // Absolute position to fill container
-    top: 0, // Align to the top of the screen
-    left: 0, // Align to the left of the screen
+    width: width,
+    height: height,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  profilePicture: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 20,
   },
   overlay: {
     position: 'absolute',
