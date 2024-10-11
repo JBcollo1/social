@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert, Modal, TextInput } from 'react-native';
 import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -28,7 +28,7 @@ const toggleLike = async (postId) => {
   const access_token = await AsyncStorage.getItem('access_token');
   if (!likedPosts[postId]) {
     // Like the post
-    await fetch(`http://192.168.100.82:5000/posts/${postId}/like`, {
+    await fetch(`http://192.168.100.82:5000/post/${postId}/like`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -37,7 +37,7 @@ const toggleLike = async (postId) => {
     setLikedPosts((prev) => ({ ...prev, [postId]: true }));
   } else {
     // Unlike the post
-    await fetch(`http://192.168.100.82:5000/posts/${postId}/unlike`, {
+    await fetch(`http://192.168.100.82:5000/post/${postId}/like`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -51,30 +51,42 @@ const toggleLike = async (postId) => {
 
 
 const addComment = async (postId) => {
-  const access_token = await AsyncStorage.getItem('access_token');
-  if (newComment.trim() === "") return; // Ensure the comment is not empty
+    const access_token = await AsyncStorage.getItem('access_token');
+    
+    if (newComment.trim() === "") return; // Ensure the comment is not empty
 
-  try {
-    const response = await fetch(`http://192.168.100.82:5000/posts/${postId}/comments`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ content: newComment }),
-    });
-    const result = await response.json();
-    setCurrentPostComments((prevComments) => [...prevComments, result.comment]); // Add new comment to the list
-    setNewComment(""); // Clear the input field
-  } catch (error) {
-    console.error('Error adding comment:', error);
-  }
+    try {
+        const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comment`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${access_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: newComment }), // Send the new comment
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`); // Handle HTTP errors
+        }
+
+        const result = await response.json();
+        
+        if (result.comment) { // Check if result.comment exists
+            setCurrentPostComments((prevComments) => [...prevComments, result.comment]); // Add new comment to the list
+        } else {
+            console.error('No comment returned from the server:', result);
+        }
+
+        setNewComment(""); // Clear the input field
+    } catch (error) {
+        console.error('Error adding comment:', error);
+    }
 };
 
 
 const showComments = async (postId) => {
   try {
-    const response = await fetch(`http://192.168.100.82:5000/posts/${postId}/comments`, {
+    const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comments`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${await AsyncStorage.getItem('access_token')}`,
@@ -193,7 +205,11 @@ const showComments = async (postId) => {
         <View style={styles.postHeader}>
           <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
             <Image
-              source={ { uri: profilePicture.uri } } // Use the profile picture for each post
+          source={
+            profilePicture 
+              ? { uri: profilePicture.uri } 
+              : { uri: 'https://media.istockphoto.com/id/1263886253/photo/financial-graphic-on-a-high-tech-abstract-background.jpg?s=612x612&w=0&k=20&c=Ru7e67lWBzT4ifiKN8IPcCE_3WKmwRwVMpvj99GxXHg=' } // Fallback URL
+          } // Use the profile picture for each post
               style={styles.profilePicture}
             />
           </TouchableOpacity>
