@@ -24,6 +24,8 @@ const HomeScreen = () => {
   const [newComment, setNewComment] = useState("");
   const [likedPosts, setLikedPosts] = useState({}); // To track liked posts
 
+  
+
 const toggleLike = async (postId) => {
   const access_token = await AsyncStorage.getItem('access_token');
   if (!likedPosts[postId]) {
@@ -49,11 +51,10 @@ const toggleLike = async (postId) => {
 
 
 
-
 const addComment = async (postId) => {
     const access_token = await AsyncStorage.getItem('access_token');
-    
-    if (newComment.trim() === "") return; // Ensure the comment is not empty
+
+    if (!newComment || newComment.trim() === "") return; // Ensure newComment exists and is not empty
 
     try {
         const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comment`, {
@@ -70,8 +71,8 @@ const addComment = async (postId) => {
         }
 
         const result = await response.json();
-        
-        if (result.comment) { // Check if result.comment exists
+
+        if (result && result.comment) { // Check if result and result.comment exists
             setCurrentPostComments((prevComments) => [...prevComments, result.comment]); // Add new comment to the list
         } else {
             console.error('No comment returned from the server:', result);
@@ -82,24 +83,35 @@ const addComment = async (postId) => {
         console.error('Error adding comment:', error);
     }
 };
-
-
 const showComments = async (postId) => {
-  try {
-    const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comments`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${await AsyncStorage.getItem('access_token')}`,
-      },
-    });
-    const result = await response.json();
-    setCurrentPostComments(result.comments);
-    setIsCommentsVisible(true);
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-  }
-};
-
+    try {
+      const access_token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comments`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+  
+      const result = await response.json();
+  
+      // Check if the result has the comments array and set it to the state
+      if (result && result.comments) {
+        setCurrentPostComments(result.comments); // Set the comments state correctly
+      } else {
+        console.error('No comments returned from the server:', result);
+      }
+  
+      setIsCommentsVisible(true); // Show the comments section
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+  
 
   const navigation = useNavigation(); // Initialize navigation
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
@@ -424,6 +436,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     fontSize: 16,
     height:40,
+    color:'black',
     backgroundColor: '#f9f9f9',
   },
   submitButton: {
