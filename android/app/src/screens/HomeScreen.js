@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
 import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import { useNavigation } from '@react-navigation/native'; // Import navigation hook
-import {jwtDecode} from 'jwt-decode'; // Fix: Correct the import of jwtDecode
+import { useNavigation } from '@react-navigation/native'; 
+import { jwtDecode } from 'jwt-decode'; 
+import CommentSection from '../services/comments';
+import LikeButton from '../services/like';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,108 +13,14 @@ const HomeScreen = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [playingVideoIndex, setPlayingVideoIndex] = useState(null); // Track which video is playing
-  const [videoPaused, setVideoPaused] = useState({}); // Track paused state per video
+  const [playingVideoIndex, setPlayingVideoIndex] = useState(null);
+  const [videoPaused, setVideoPaused] = useState({});
   const [profilePicture, setProfilePicture] = useState(null);
   const [userId, setUserId] = useState(null);
   const [profileExists, setProfileExists] = useState(true);
   const [hasNextPage, setHasNextPage] = useState(true);
 
-  const [isCommentsVisible, setIsCommentsVisible] = useState(false);
-  const [currentPostComments, setCurrentPostComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
-  const [likedPosts, setLikedPosts] = useState({}); // To track liked posts
-
-  
-
-const toggleLike = async (postId) => {
-  const access_token = await AsyncStorage.getItem('access_token');
-  if (!likedPosts[postId]) {
-    // Like the post
-    await fetch(`http://192.168.100.82:5000/post/${postId}/like`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-    setLikedPosts((prev) => ({ ...prev, [postId]: true }));
-  } else {
-    // Unlike the post
-    await fetch(`http://192.168.100.82:5000/post/${postId}/like`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-    setLikedPosts((prev) => ({ ...prev, [postId]: false }));
-  }
-};
-
-
-
-const addComment = async (postId) => {
-    const access_token = await AsyncStorage.getItem('access_token');
-
-    if (!newComment || newComment.trim() === "") return; // Ensure newComment exists and is not empty
-
-    try {
-        const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comment`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${access_token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: newComment }), // Send the new comment
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`); // Handle HTTP errors
-        }
-
-        const result = await response.json();
-
-        if (result && result.comment) { // Check if result and result.comment exists
-            setCurrentPostComments((prevComments) => [...prevComments, result.comment]); // Add new comment to the list
-        } else {
-            console.error('No comment returned from the server:', result);
-        }
-
-        setNewComment(""); // Clear the input field
-    } catch (error) {
-        console.error('Error adding comment:', error);
-    }
-};
-const showComments = async (postId) => {
-    try {
-      const access_token = await AsyncStorage.getItem('access_token');
-      const response = await fetch(`http://192.168.100.82:5000/post/${postId}/comments`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-  
-      const result = await response.json();
-  
-      // Check if the result has the comments array and set it to the state
-      if (result && result.comments) {
-        setCurrentPostComments(result.comments); // Set the comments state correctly
-      } else {
-        console.error('No comments returned from the server:', result);
-      }
-  
-      setIsCommentsVisible(true); // Show the comments section
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    }
-  };
-  
-
-  const navigation = useNavigation(); // Initialize navigation
+  const navigation = useNavigation();
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
 
   // Fetch user ID from token
@@ -152,12 +59,12 @@ const showComments = async (postId) => {
         },
       });
       if (!response.ok) {
-        setProfileExists(false);  // No profile found
+        setProfileExists(false);  
         return;
       }
       const data = await response.json();
       setProfilePicture({ uri: data.profile_picture });
-      setProfileExists(true);  // Profile found
+      setProfileExists(true);  
     } catch (error) {
       setProfileExists(false);
       Alert.alert('Error', error.message || 'Failed to fetch profile.');
@@ -173,7 +80,7 @@ const showComments = async (postId) => {
 
   // Fetch posts with pagination
   const fetchPosts = async (currentPage) => {
-    if (!hasNextPage) return; // Stop fetching if no more pages
+    if (!hasNextPage) return; 
     setLoading(true);
     const access_token = await AsyncStorage.getItem('access_token');
     try {
@@ -184,8 +91,8 @@ const showComments = async (postId) => {
         },
       });
       const result = await response.json();
-      setPosts((prevPosts) => [...prevPosts, ...result.posts]); // Append new posts
-      setHasNextPage(result.has_next_page); // Update if more pages exist
+      setPosts((prevPosts) => [...prevPosts, ...result.posts]);
+      setHasNextPage(result.has_next_page);
     } catch (error) {
       console.error('Error fetching posts:', error);
     }
@@ -197,129 +104,71 @@ const showComments = async (postId) => {
     if (viewableItems.length > 0) {
       const visibleIndex = viewableItems[0].index;
       setPlayingVideoIndex(visibleIndex);
-      setVideoPaused((prev) => ({ ...prev, [visibleIndex]: false })); // Reset paused state for the visible video
+      setVideoPaused((prev) => ({ ...prev, [visibleIndex]: false }));
     }
   }).current;
 
   // Toggle play/pause on video press
   const handleVideoPress = (index) => {
-    setVideoPaused((prev) => ({ ...prev, [index]: !prev[index] })); // Toggle play/pause on tap
+    setVideoPaused((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
   // Render each post
-  const renderPost = ({ item, index }) => {
-    const isPlaying = index === playingVideoIndex; // Only play video if it matches the playing index
-    const paused = videoPaused[index] || !isPlaying; // Respect the manual paused state
+  // In the renderPost function
+const renderPost = ({ item, index }) => {
+  const isPlaying = index === playingVideoIndex;
+  const paused = videoPaused[index] || !isPlaying;
 
-    return (
-      <View style={styles.postContainer}>
-        {/* Profile info, username, and post meta */}
-        <View style={styles.postHeader}>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
-            <Image
-          source={
-            profilePicture 
-              ? { uri: profilePicture.uri } 
-              : { uri: 'https://media.istockphoto.com/id/1263886253/photo/financial-graphic-on-a-high-tech-abstract-background.jpg?s=612x612&w=0&k=20&c=Ru7e67lWBzT4ifiKN8IPcCE_3WKmwRwVMpvj99GxXHg=' } // Fallback URL
-          } // Use the profile picture for each post
-              style={styles.profilePicture}
-            />
-          </TouchableOpacity>
-          <Text style={styles.username}>{item.username}</Text>
-        </View>
-
-        {/* Media content */}
-        <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
-          {item.video_url ? (
-            <Video
-              source={{ uri: item.video_url }}
-              style={styles.video}
-              paused={paused}
-              repeat={true}
-              resizeMode="cover"
-              ignoreSilentSwitch="obey"
-              onError={() => console.error('Error loading video at index:', index)}
-            />
-          ) : item.photo_url ? (
-            <Image source={{ uri: item.photo_url }} style={styles.image} resizeMode="cover" />
-          ) : (
-            <Text style={styles.text}>No Video or Photo Available</Text>
-          )}
+  return (
+    <View style={styles.postContainer}>
+      <View style={styles.postHeader}>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
+          <Image
+            source={
+              profilePicture 
+                ? { uri: profilePicture.uri } 
+                : { uri: 'https://media.istockphoto.com/id/1263886253/photo/financial-graphic-on-a-high-tech-abstract-background.jpg?s=612x612&w=0&k=20&c=Ru7e67lWBzT4ifiKN8IPcCE_3WKmwRwVMpvj99GxXHg=' } 
+            }
+            style={styles.profilePicture}
+          />
         </TouchableOpacity>
-
-        {/* Interaction icons (like, comment, share) */}
-        <View style={styles.interactionRow}>
-        <TouchableOpacity
-        style={styles.iconButton}
-        onPress={() => toggleLike(item.id)}
-        >
-        <Icon name={likedPosts[item.id] ? "heart" : "heart-o"} size={30} color={likedPosts[item.id] ? "red" : "black"} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton} onPress={() => showComments(item.id)}>
-  <Icon name="comment-o" size={30} color="black" />
-</TouchableOpacity>
-
-{/* Comments Modal */}
-<Modal
-  visible={isCommentsVisible}
-  animationType="slide"
-  transparent={true}
-  onRequestClose={() => setIsCommentsVisible(false)}
->
-  <View style={styles.modalContainer}>
-    <View style={styles.modalContent}>
-      {/* List of comments */}
-      <FlatList
-        data={currentPostComments}
-        renderItem={({ item }) => (
-          <View style={styles.commentContainer}>
-            <Text style={styles.commentText}>
-              <Text style={styles.commentUsername}>{item.username}: </Text>
-              {item.content}
-            </Text>
-          </View>
-        )}
-        keyExtractor={(item) => item.id.toString()}
-      />
-      
-      {/* Input field for adding a new comment */}
-      <TextInput
-        style={styles.input}
-        placeholder="Add a comment..."
-        value={newComment}
-        onChangeText={(text) => setNewComment(text)}
-      />
-
-      {/* Submit comment */}
-      <TouchableOpacity
-        style={styles.submitButton}
-        onPress={() => addComment(item.id)}  
-      >
-        <Text style={styles.submitButtonText}>Post</Text>
-      </TouchableOpacity>
-
-      {/* Close button */}
-      <TouchableOpacity onPress={() => setIsCommentsVisible(false)} style={styles.closeButton}>
-        <Text style={styles.closeButtonText}>Close</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-</Modal>
-
-
-          <TouchableOpacity style={styles.iconButton}>
-            <Icon name="share-square-o" size={30} color="black" />
-          </TouchableOpacity>
-        </View>
-        
-
-        {/* Caption or description */}
-        <Text style={styles.caption}>
-          <Text style={styles.username}>{item.username}</Text> {item.caption}
-        </Text>
+        <Text style={styles.username}>{item.username || 'Unknown User'}</Text>
       </View>
-    );
-  };
+
+      <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
+        {item.video_url ? (
+          <Video
+            source={{ uri: item.video_url }}
+            style={styles.video}
+            paused={paused}
+            repeat={true}
+            resizeMode="cover"
+            ignoreSilentSwitch="obey"
+            onError={() => console.error('Error loading video at index:', index)}
+          />
+        ) : item.photo_url ? (
+          <Image source={{ uri: item.photo_url }} style={styles.image} resizeMode="cover" />
+        ) : (
+          <Text style={styles.text}>No Video or Photo Available</Text>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.interactionRow}>
+        <LikeButton postId={item.id} />
+        <CommentSection postId={item.id} />
+      </View>
+
+      <Text style={styles.caption}>
+      <Image
+          source={item.pics ? { uri: item.pics } : { uri: 'default_image_url' }}
+          style={styles.captionProfilePicture} // Add this style to set the size appropriately
+        />
+        <Text style={styles.username}>{item.username || 'Unknown User'}</Text> 
+        {item.content ? ` ${item.content}` : ' No caption available.'}
+      </Text>
+    </View>
+  );
+};
 
   return (
     <View style={styles.container}>
@@ -348,6 +197,7 @@ const showComments = async (postId) => {
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -369,6 +219,12 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  captionProfilePicture: {
+    width: 30, // Adjust the size as needed
+    height: 30,
+    borderRadius: 15, // Make it circular
+    marginRight: 5, // Spacing between image and text
   },
   username: {
     fontSize: 14,
