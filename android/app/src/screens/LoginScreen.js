@@ -7,7 +7,7 @@ const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-
+    
     const handleLogin = async () => {
         setLoading(true);
         try {
@@ -25,7 +25,7 @@ const LoginScreen = ({ navigation }) => {
             if (response.ok) {
                 await AsyncStorage.setItem('access_token', data.access_token);
                 console.log("Login successful", data);
-                navigation.navigate("Home");
+                navigation.navigate("Main");
             } else {
                 if (data.message === "User does not exist") {
                     navigation.navigate("Register");
