@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image,A } from 'react-native';
 import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native'; 
@@ -19,6 +19,7 @@ const HomeScreen = () => {
   const [userId, setUserId] = useState(null);
   const [profileExists, setProfileExists] = useState(true);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [name, setName] = useState("");
 
   const navigation = useNavigation();
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
@@ -64,6 +65,7 @@ const HomeScreen = () => {
       }
       const data = await response.json();
       setProfilePicture({ uri: data.profile_picture });
+      setName(data.username);
       setProfileExists(true);  
     } catch (error) {
       setProfileExists(false);
@@ -132,7 +134,7 @@ const renderPost = ({ item, index }) => {
             style={styles.profilePicture}
           />
         </TouchableOpacity>
-        <Text style={styles.username}>{item.username || 'Unknown User'}</Text>
+        <Text style={styles.username}>{name || 'Unknown User'}</Text>
       </View>
 
       <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
@@ -157,15 +159,19 @@ const renderPost = ({ item, index }) => {
         <LikeButton postId={item.id} />
         <CommentSection postId={item.id} />
       </View>
-
-      <Text style={styles.caption}>
-      <Image
-          source={item.pics ? { uri: item.pics } : { uri: 'default_image_url' }}
-          style={styles.captionProfilePicture} // Add this style to set the size appropriately
-        />
-        <Text style={styles.username}>{item.username || 'Unknown User'}</Text> 
-        {item.content ? ` ${item.content}` : ' No caption available.'}
-      </Text>
+      
+      <View style={styles.captionContainer}>
+        <View style={styles.captionProfilePictureContainer}>
+          <Image
+            source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/fancy.webp')}
+            style={styles.captionProfilePicture}
+          />
+        </View>
+        <Text style={styles.captionText}>
+          <Text style={styles.username}>{item.username || 'Unknown User'}</Text>
+          {item.content ? ` ${item.content}` : ' No caption available.'}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -220,11 +226,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: 10,
   },
-  captionProfilePicture: {
-    width: 30, // Adjust the size as needed
+  captionProfilePictureContainer: {
+    width: 30,
     height: 30,
-    borderRadius: 15, // Make it circular
-    marginRight: 5, // Spacing between image and text
+    borderRadius: 15,
+    overflow: 'hidden',
+    marginRight: 10,
+  },
+  captionProfilePicture: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  captionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  captionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#000',
   },
   username: {
     fontSize: 14,
