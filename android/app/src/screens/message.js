@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -8,32 +8,49 @@ const MessageScreen = () => {
   const [newMessage, setNewMessage] = useState('');
   const navigation = useNavigation();
   const route = useRoute();
-  const { recipientId, recipientName } = route.params;
+  
+  // Add a check for route.params
+  const { recipientId, recipientName, currentUserId } = route.params || {};
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+    console.log('Route params:', route.params); // Add this line for debugging
+    if (recipientId) {
+      fetchConversation();
+      const interval = setInterval(fetchConversation, 15000);
+      return () => clearInterval(interval);
+    } else {
+      // Handle the case when recipientId is not available
+      console.error('Missing recipientId'); // Add this line for debugging
+      Alert.alert('Error', 'Recipient information is missing');
+      navigation.goBack(); // Optionally navigate back
+    }
+  }, [recipientId]);
 
-  const fetchMessages = async () => {
+  // Fetch the conversation between the current user and recipient
+  const fetchConversation = async () => {
+    if (!recipientId) return;
     try {
       const access_token = await AsyncStorage.getItem('access_token');
-      const response = await fetch('http://192.168.100.82:5000/messages', {
+      const response = await fetch(`http://192.168.100.82:5000/conversation/${recipientId}`, {
         headers: { Authorization: `Bearer ${access_token}` },
       });
       const data = await response.json();
-      setMessages(data.reverse()); // Reverse to show newest messages at the bottom
+      if (response.ok) {
+        setMessages(data.reverse()); // Show messages in the correct order
+      } else {
+        Alert.alert('Error', data.message || 'Failed to fetch messages');
+      }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Error fetching conversation:', error);
     }
   };
 
+  // Send a new message
   const sendMessage = async () => {
-    if (newMessage.trim() === '') return;
+    if (!recipientId || newMessage.trim() === '') return;
     try {
       const access_token = await AsyncStorage.getItem('access_token');
-      await fetch(`http://192.168.100.82:5000/message/${recipientId}`, {
+      const response = await fetch(`http://192.168.100.82:5000/message/send/${recipientId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -41,31 +58,51 @@ const MessageScreen = () => {
         },
         body: JSON.stringify({ content: newMessage }),
       });
-      setNewMessage('');
-      fetchMessages();
+      const data = await response.json();
+      if (response.ok) {
+        setNewMessage('');
+        fetchConversation(); // Refresh the conversation after sending
+      } else {
+        Alert.alert('Error', data.message || 'Failed to send message');
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-  const renderMessage = ({ item }) => (
-    <View style={[styles.messageBubble, item.sender === recipientName ? styles.receivedMessage : styles.sentMessage]}>
-      <Text style={styles.messageText}>{item.content}</Text>
-      <Text style={styles.timestamp}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
-    </View>
-  );
+  // Render a single message bubble
+  const renderMessage = ({ item }) => {
+    console.log('Rendering message:', item); // Add this line for debugging
+    if (!item || typeof item !== 'object') {
+      console.error('Invalid message item:', item);
+      return null;
+    }
+    return (
+      <View
+        style={[
+          styles.messageBubble,
+          item.sender === recipientName ? styles.receivedMessage : styles.sentMessage,
+        ]}
+      >
+        <Text style={styles.messageText}>{item.content || 'No content'}</Text>
+        <Text style={styles.timestamp}>
+          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'No timestamp'}
+        </Text>
+      </View>
+    );
+  };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item, index) => index.toString()}
-        inverted
+        inverted // This will keep the newest messages at the bottom
       />
       <View style={styles.inputContainer}>
         <TextInput

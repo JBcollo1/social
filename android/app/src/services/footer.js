@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 
-const Footer = () => {
+const Footer = ({ currentUserId }) => {
   const navigation = useNavigation();
 
   return (
@@ -11,10 +11,12 @@ const Footer = () => {
       <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.iconContainer}>
         <Icon name="home-outline" size={24} color="black" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Post')} style={styles.iconContainer}>
-        <Icon name="add-circle-outline" size={24} color="black" />
+      <TouchableOpacity onPress={() => navigation.navigate('Messages', {
+        currentUserId: currentUserId
+      })} style={styles.iconContainer}>
+        <Icon name="chatbubbles-outline" size={24} color="black" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Messages')} style={styles.iconContainer}>
+      <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: currentUserId })} style={styles.iconContainer}>
         <Icon name="person-outline" size={24} color="black" />
       </TouchableOpacity>
     </View>
