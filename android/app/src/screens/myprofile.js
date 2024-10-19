@@ -16,7 +16,7 @@ const MyProfileScreen = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [userId, setUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const videoRef = useRef(null);
+  const videoRef = useRef(null); 
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -50,7 +50,6 @@ const MyProfileScreen = () => {
       });
       const data = await response.json();
       setUserData(data);
-      console.log(data);
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
@@ -64,6 +63,7 @@ const MyProfileScreen = () => {
       });
       const data = await response.json();
       setPosts(data);
+      console.log(data);
     } catch (error) {
       console.error('Error fetching user posts:', error);
     }
@@ -84,16 +84,16 @@ const MyProfileScreen = () => {
 
   const renderPost = ({ item }) => {
     const isLikedPost = activeTab === 'liked';
-    const imageUrl = isLikedPost ? item.photo_url : (item.image_url || item.video_url);
-    const videoUrl = isLikedPost ? item.video_url : null;
-    const username = isLikedPost ? item.username : null;
+    const imageUrl = item.photo_url;
+    const videoUrl = item.video_url;
+    const username = item.username;
 
     return (
       <TouchableOpacity 
         style={styles.postContainer}
         onPress={() => setSelectedPost(item)}
       >
-        {imageUrl && !videoUrl && (
+        {imageUrl && (
           <Image
             source={{ uri: imageUrl }}
             style={styles.postImage}
@@ -104,8 +104,8 @@ const MyProfileScreen = () => {
             <Text>Video</Text>
           </View>
         )}
-        {isLikedPost && username && (
-          <Text style={styles.likedPostUsername}>{username}</Text>
+        {username && (
+          <Text style={styles.postUsername}>{username}</Text>
         )}
       </TouchableOpacity>
     );
@@ -114,7 +114,7 @@ const MyProfileScreen = () => {
   const renderFullScreenPost = () => {
     if (!selectedPost) return null;
 
-    const imageUrl = selectedPost.photo_url || selectedPost.image_url;
+    const imageUrl = selectedPost.photo_url;
     const videoUrl = selectedPost.video_url;
 
     const togglePlayPause = () => {
@@ -132,12 +132,12 @@ const MyProfileScreen = () => {
             style={styles.closeButton}
             onPress={() => {
               setSelectedPost(null);
-              setIsPlaying(true); // Reset playing state when closing
+              setIsPlaying(true);
             }}
           >
             <Text style={styles.closeButtonText}>Close</Text>
           </TouchableOpacity>
-          {imageUrl && !videoUrl && (
+          {imageUrl && (
             <Image
               source={{ uri: imageUrl }}
               style={styles.fullScreenImage}
@@ -168,6 +168,7 @@ const MyProfileScreen = () => {
           )}
           <Text style={styles.fullScreenUsername}>{selectedPost.username}</Text>
           <Text style={styles.fullScreenContent}>{selectedPost.content}</Text>
+          <Text style={styles.fullScreenLikes}>Likes: {selectedPost.likes}</Text>
         </View>
       </Modal>
     );
@@ -189,13 +190,19 @@ const MyProfileScreen = () => {
           style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
           onPress={() => setActiveTab('posts')}
         >
-          <Text style={styles.tabText}>Posts</Text>
+          <Text style={[
+            styles.tabText,
+            activeTab === 'posts' && styles.activeTabText
+          ]}>Posts</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'liked' && styles.activeTab]}
           onPress={() => setActiveTab('liked')}
         >
-          <Text style={styles.tabText}>Liked</Text>
+          <Text style={[
+            styles.tabText,
+            activeTab === 'liked' && styles.activeTabText
+          ]}>Liked</Text>
         </TouchableOpacity>
       </View>
 
@@ -243,10 +250,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#eee',
+    marginBottom: 10,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 15,
     alignItems: 'center',
   },
   activeTab: {
@@ -255,6 +263,11 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#ee1d52',
     fontWeight: 'bold',
   },
   postContainer: {
@@ -266,7 +279,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  likedPostUsername: {
+  postUsername: {
     position: 'absolute',
     bottom: 5,
     left: 5,
@@ -317,6 +330,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 5,
     paddingHorizontal: 20,
+  },
+  fullScreenLikes: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 5,
   },
   videoContainer: {
     width: width,
