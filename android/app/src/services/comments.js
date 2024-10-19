@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, FlatList, TextInput, TouchableOpacity, Text, StyleSheet, Modal } from 'react-native';
+import { View, FlatList, TextInput, TouchableOpacity, Text, StyleSheet, Modal, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CommentSection = ({ postId }) => {
@@ -16,13 +16,13 @@ const CommentSection = ({ postId }) => {
           Authorization: `Bearer ${access_token}`,
         },
       });
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      const result = await response.json();
-      if (result && result.comments) {
-        setCurrentPostComments(result.comments);
-      }
+
+      const comments = await response.json();
+      setCurrentPostComments(comments);
       setIsCommentsVisible(true);
     } catch (error) {
       console.error('Error fetching comments:', error);
@@ -58,29 +58,39 @@ const CommentSection = ({ postId }) => {
         <Text style={styles.showCommentsButton}>Show Comments</Text>
       </TouchableOpacity>
 
-      <Modal visible={isCommentsVisible} animationType="slide">
-        <View style={styles.modalContainer}>
-          <FlatList
-            data={currentPostComments}
-            renderItem={({ item }) => (
-              <View style={styles.commentContainer}>
-                <Text>{item.username}: {item.comment}  </Text>
-              </View>
-            )}
-            keyExtractor={(item) => item.id.toString()}
-          />
-          <TextInput
-            style={styles.input}
-            value={newComment}
-            onChangeText={setNewComment}
-            placeholder="Add a comment..."
-          />
-          <TouchableOpacity onPress={addComment}>
-            <Text style={styles.submitCommentButton}>Submit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsCommentsVisible(false)}>
-            <Text style={styles.closeButton}>Close</Text>
-          </TouchableOpacity>
+      <Modal visible={isCommentsVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Comments</Text>
+              <TouchableOpacity onPress={() => setIsCommentsVisible(false)}>
+                <Text style={styles.closeButton}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={currentPostComments}
+              renderItem={({ item }) => (
+                <View style={styles.commentContainer}>
+                  <Text style={styles.username}>{item.user_id}</Text>
+                  <Text style={styles.commentText}>this{item.comments}</Text>
+                </View>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.commentList}
+            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={newComment}
+                onChangeText={setNewComment}
+                placeholder="Add a comment..."
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity onPress={addComment} style={styles.submitButton}>
+                <Text style={styles.submitButtonText}>Post</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </View>
@@ -88,7 +98,84 @@ const CommentSection = ({ postId }) => {
 };
 
 const styles = StyleSheet.create({
-  // Styles for CommentSection
+  showCommentsButton: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  closeButton: {
+    fontSize: 16,
+    color: '#999',
+  },
+  commentList: {
+    flex: 1,
+  },
+  commentContainer: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  username: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#000',
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#000',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  input: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    marginRight: 10,
+    color: '#000',
+  },
+  submitButton: {
+    backgroundColor: '#ee1d52',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 });
 
 export default CommentSection;

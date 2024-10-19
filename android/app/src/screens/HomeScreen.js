@@ -299,43 +299,8 @@ const styles = StyleSheet.create({
   commentContainer: {
     paddingVertical: 10,
   },
-  commentText: {
-    fontSize: 14,
-    color: '#000',
-  },
-  commentUsername: {
-    fontWeight: 'bold',
-  },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginVertical: 10,
-    fontSize: 16,
-    height:40,
-    color:'black',
-    backgroundColor: '#f9f9f9',
-  },
-  submitButton: {
-    backgroundColor: '#00f',
-    paddingVertical: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  closeButton: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: 'blue',
-    fontSize: 16,
-  },
+
+  
 });
 
 export default HomeScreen;
