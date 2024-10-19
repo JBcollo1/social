@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, FlatList, TextInput, TouchableOpacity, Text, StyleSheet, Modal, SafeAreaView } from 'react-native';
+import { View, FlatList, TextInput, TouchableOpacity, Text, StyleSheet, Modal, SafeAreaView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CommentSection = ({ postId }) => {
@@ -71,9 +71,15 @@ const CommentSection = ({ postId }) => {
               data={currentPostComments}
               renderItem={({ item }) => (
                 <View style={styles.commentContainer}>
-                  <Text style={styles.username}>{item.user_id}</Text>
-                  <Text style={styles.commentText}>this{item.comments}</Text>
+                <View style={styles.commentHeader}>
+                  <Image
+                    source={item.profile_pic ? { uri: item.profile_pic } : require('../assets/fancy.webp')}
+                    style={styles.Picture}
+                  />
+                  <Text style={styles.username}>{item.username}</Text>
                 </View>
+                <Text style={styles.commentText}>{item.content}</Text>
+              </View>
               )}
               keyExtractor={(item) => item.id.toString()}
               style={styles.commentList}
@@ -139,6 +145,17 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  Picture: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
   },
   username: {
     fontWeight: 'bold',

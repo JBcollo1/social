@@ -11,6 +11,7 @@ import RegisterScreen from "../screens/RegisterScreen";
 import VerificationScreen from "../screens/verification";
 import PostCreationScreen from "../screens/PostCreationScreen";
 import Footer from "../services/footer";
+import MyProfileScreen from "../screens/myprofile";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -18,7 +19,7 @@ const Tab = createBottomTabNavigator();
 const MainTabs = () => (
   <Tab.Navigator tabBar={props => <Footer {...props} />}>
     <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Screen name="Profile" component={MyProfileScreen} />
   </Tab.Navigator>
 );
 
