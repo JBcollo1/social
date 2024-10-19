@@ -14,7 +14,7 @@ const Footer = () => {
       <TouchableOpacity onPress={() => navigation.navigate('Post')} style={styles.iconContainer}>
         <Icon name="add-circle-outline" size={24} color="black" />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.iconContainer}>
+      <TouchableOpacity onPress={() => navigation.navigate('Messages')} style={styles.iconContainer}>
         <Icon name="person-outline" size={24} color="black" />
       </TouchableOpacity>
     </View>

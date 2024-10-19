@@ -12,6 +12,7 @@ import VerificationScreen from "../screens/verification";
 import PostCreationScreen from "../screens/PostCreationScreen";
 import Footer from "../services/footer";
 import MyProfileScreen from "../screens/myprofile";
+import MessageScreen from "../screens/message";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -20,23 +21,31 @@ const MainTabs = () => (
   <Tab.Navigator tabBar={props => <Footer {...props} />}>
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Profile" component={MyProfileScreen} />
+    <Tab.Screen name="Messages" component={MessageScreen} />
   </Tab.Navigator>
 );
 
 const AppNavigator = () => {
+    const defaultScreenOptions = {
+        headerTitle: () => <Header />,
+        headerShown: true
+    };
+
     return ( 
         <NavigationContainer>
-            <Stack.Navigator initialRouteName="Login">
-                <Stack.Screen name="Login" component={LoginScreen} options={{headerTitle: () => <Header />, headerShown: true}}/>
-                <Stack.Screen name="Register" component={RegisterScreen} options={{headerTitle: () => <Header />, headerShown: true}}/>
-                <Stack.Screen name="Verification" component={VerificationScreen} options={{headerTitle: () => <Header />, headerShown: true}}/>
+            <Stack.Navigator 
+                initialRouteName="Login"
+                screenOptions={defaultScreenOptions}
+            >
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+                <Stack.Screen name="Verification" component={VerificationScreen} />
+                <Stack.Screen name="Post" component={PostCreationScreen} />
                 <Stack.Screen name="Main" component={MainTabs} options={{headerShown: false}}/>
                 <Stack.Screen 
-                    name="Post" 
-                    component={PostCreationScreen} 
+                    name="Messages" 
+                    component={MessageScreen} 
                     options={({ navigation }) => ({
-                        headerTitle: () => <Header />, 
-                        headerShown: true,
                         headerLeft: () => (
                             <TouchableOpacity onPress={() => navigation.goBack()}>
                                 <Text style={{ color: 'black', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>Cancel</Text>
