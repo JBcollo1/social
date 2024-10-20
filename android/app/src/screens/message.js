@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Platform, 
+  Alert, 
+  SafeAreaView, 
+  Image,
+  ScrollView,
+  KeyboardAvoidingView,
+  Keyboard
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -7,33 +20,46 @@ const MessageScreen = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  
   const navigation = useNavigation();
   const route = useRoute();
-  const flatListRef = useRef(null);
+  const scrollViewRef = useRef();
   
   const { recipientId, recipientName, currentUserId } = route.params || {};
 
   useEffect(() => {
-    console.log('Route params:', route.params);
     if (recipientId) {
       fetchConversation();
       const interval = setInterval(fetchConversation, 15000);
       return () => clearInterval(interval);
     } else {
-      console.warn('Missing recipientId. Route params:', route.params);
       Alert.alert(
         'Error',
         'Recipient information is missing. Please select a conversation.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     }
-  }, [recipientId, navigation, route.params]);
+  }, [recipientId]);
+
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      'keyboardWillShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const keyboardWillHideListener = Keyboard.addListener(
+      'keyboardWillHide',
+      () => setKeyboardHeight(0)
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
 
   const fetchConversation = async () => {
-    if (!recipientId) {
-      console.warn('Attempted to fetch conversation without recipientId');
-      return;
-    }
+    if (!recipientId) return;
     setLoading(true);
     try {
       const access_token = await AsyncStorage.getItem('access_token');
@@ -47,7 +73,6 @@ const MessageScreen = () => {
         throw new Error(data.message || 'Failed to fetch messages');
       }
     } catch (error) {
-      console.error('Error fetching conversation:', error);
       Alert.alert('Error', `Failed to fetch messages: ${error.message}`);
     } finally {
       setLoading(false);
@@ -70,7 +95,7 @@ const MessageScreen = () => {
       const data = await response.json();
       if (response.ok) {
         setNewMessage('');
-        setMessages(prevMessages => [...prevMessages, data]);
+        await fetchConversation();
       } else {
         if (data.message === 'Receiver not found.') {
           Alert.alert('Error', 'The recipient user was not found. They may have been deleted or deactivated.');
@@ -79,7 +104,6 @@ const MessageScreen = () => {
         }
       }
     } catch (error) {
-      console.error('Error sending message:', error);
       Alert.alert('Error', `Failed to send message: ${error.message}`);
     } finally {
       setLoading(false);
@@ -87,42 +111,44 @@ const MessageScreen = () => {
   };
 
   const renderMessage = ({ item }) => {
-    if (!item || typeof item !== 'object') {
-      console.error('Invalid message item:', item);
-      return null;
-    }
     const isSentMessage = item.sender_id === currentUserId;
+    const profilePicture = isSentMessage ? item.receiver_profile_picture : item.sender_profile_picture;
+
     return (
-      <View
-        style={[
-          styles.messageBubble,
-          isSentMessage ? styles.sentMessage : styles.receivedMessage,
-        ]}
-      >
-        <Text style={styles.messageText}>{item.content || 'No content'}</Text>
-        <Text style={styles.timestamp}>
-          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'No timestamp'}
-        </Text>
+      <View style={[styles.messageRow, isSentMessage ? styles.sentMessageRow : styles.receivedMessageRow]}>
+        {!isSentMessage && renderAvatar(profilePicture)}
+        <View style={styles.messageContentContainer}>
+          <View style={[styles.messageBubble, isSentMessage ? styles.sentMessage : styles.receivedMessage]}>
+            <Text style={[styles.messageText, isSentMessage ? styles.sentMessageText : styles.receivedMessageText]}>
+              {item.content || 'No content'}
+            </Text>
+          </View>
+          <Text style={styles.timestamp}>
+            {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No timestamp'}
+          </Text>
+        </View>
+        {isSentMessage && renderAvatar(profilePicture)}
       </View>
     );
   };
 
-  useEffect(() => {
-    if (flatListRef.current && messages.length > 0) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
+  const renderAvatar = (profilePicture) => (
+    <View style={styles.avatarContainer}>
+      {profilePicture ? (
+        <Image source={{ uri: profilePicture }} style={styles.avatar} />
+      ) : (
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{recipientName[0]}</Text>
+        </View>
+      )}
+    </View>
+  );
 
   if (!recipientId) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>
-          No recipient selected. Please choose a conversation.
-        </Text>
-        <TouchableOpacity
-          style={styles.goBackButton}
-          onPress={() => navigation.goBack()}
-        >
+        <Text style={styles.errorText}>No recipient selected. Please choose a conversation.</Text>
+        <TouchableOpacity style={styles.goBackButton} onPress={() => navigation.goBack()}>
           <Text style={styles.goBackButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -130,97 +156,167 @@ const MessageScreen = () => {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item, index) => (item.id ? item.id.toString() : `message-${index}`)}
-        contentContainerStyle={styles.messageList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Type a message..."
-          placeholderTextColor="#999"
-          editable={!loading}
-        />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={loading}>
-          <Text style={styles.sendButtonText}>{loading ? 'Sending...' : 'Send'}</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 87}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.recipientInfo}>
+            <Text style={styles.recipientName}>{recipientName}</Text>
+          </View>
+        </View>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={[styles.messageList, { paddingBottom: keyboardHeight }]}
+          onContentSizeChange={() => scrollViewRef.current.scrollToEnd({ animated: true })}
+        >
+          {messages.map((item, index) => renderMessage({ item, index }))}
+        </ScrollView>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Type a message"
+            placeholderTextColor="#8e8e93"
+            editable={!loading}
+            multiline
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={loading}>
+            <Text style={styles.sendButtonText}>{loading ? '•••' : '→'}</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'black', // Slightly darker background
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#383740',
+  },
+  backButton: {
+    padding: 10,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 24,
+  },
+  recipientInfo: {
+    marginLeft: 15,
+  },
+  recipientName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   messageList: {
     flexGrow: 1,
     justifyContent: 'flex-end',
     paddingVertical: 10,
   },
+  messageRow: {
+    flexDirection: 'row',
+    marginVertical: 2,
+    paddingHorizontal: 10,
+  },
+  sentMessageRow: {
+    justifyContent: 'flex-end',
+  },
+  receivedMessageRow: {
+    justifyContent: 'flex-start',
+  },
+  messageContentContainer: {
+    flexDirection: 'column',
+    maxWidth: '75%',
+  },
   messageBubble: {
-    maxWidth: '70%',
-    padding: 10,
+    padding: 12,
     borderRadius: 20,
-    marginVertical: 5,
-    marginHorizontal: 10,
+    marginBottom: 2,
   },
   sentMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#ee1d52',
+    backgroundColor: '#dcf8c6',
   },
   receivedMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#333',
+    backgroundColor: '#fff',
   },
-  messageText: {
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    marginHorizontal: 5,
+    alignSelf: 'flex-end',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#075e54',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  messageText: {
+    fontSize: 16,
+  },
+  sentMessageText: {
+    color: '#000',
+  },
+  receivedMessageText: {
+    color: '#000',
   },
   timestamp: {
-    color: '#ddd',
-    fontSize: 12,
-    marginTop: 5,
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
     alignSelf: 'flex-end',
   },
   inputContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 10,
-    backgroundColor: '#111',
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#383740',
+    backgroundColor: '#383740',
   },
   input: {
     flex: 1,
-    backgroundColor: '#222',
-    color: '#fff',
+    backgroundColor: '#f0f0f0',
+    color: '#000',
     borderRadius: 20,
     paddingHorizontal: 15,
     paddingVertical: 10,
     marginRight: 10,
+    fontSize: 16,
+    maxHeight: 100, // Limit the height of the input
   },
   sendButton: {
-    backgroundColor: '#ee1d52',
+    backgroundColor: '#075e54',
     borderRadius: 20,
-    paddingHorizontal: 20,
     paddingVertical: 10,
+    paddingHorizontal: 15,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButtonText: {
     color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   errorContainer: {
