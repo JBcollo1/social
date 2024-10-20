@@ -6,27 +6,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 const MessageScreen = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
   const flatListRef = useRef(null);
   
   const { recipientId, recipientName, currentUserId } = route.params || {};
-
-  if (!recipientId) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>
-          No recipient selected. Please choose a conversation.
-        </Text>
-        <TouchableOpacity
-          style={styles.goBackButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.goBackButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   useEffect(() => {
     console.log('Route params:', route.params);
@@ -44,12 +29,12 @@ const MessageScreen = () => {
     }
   }, [recipientId, navigation, route.params]);
 
-  // Fetch the conversation between the current user and recipient
   const fetchConversation = async () => {
     if (!recipientId) {
       console.warn('Attempted to fetch conversation without recipientId');
       return;
     }
+    setLoading(true);
     try {
       const access_token = await AsyncStorage.getItem('access_token');
       const response = await fetch(`http://192.168.100.82:5000/conversation/${recipientId}`, {
@@ -64,12 +49,14 @@ const MessageScreen = () => {
     } catch (error) {
       console.error('Error fetching conversation:', error);
       Alert.alert('Error', `Failed to fetch messages: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Send a new message
   const sendMessage = async () => {
     if (!recipientId || newMessage.trim() === '') return;
+    setLoading(true);
     try {
       const access_token = await AsyncStorage.getItem('access_token');
       const response = await fetch(`http://192.168.100.82:5000/message/send/${recipientId}`, {
@@ -85,15 +72,20 @@ const MessageScreen = () => {
         setNewMessage('');
         setMessages(prevMessages => [...prevMessages, data]);
       } else {
-        throw new Error(data.message || 'Failed to send message');
+        if (data.message === 'Receiver not found.') {
+          Alert.alert('Error', 'The recipient user was not found. They may have been deleted or deactivated.');
+        } else {
+          throw new Error(data.message || 'Failed to send message');
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', `Failed to send message: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Render a single message bubble
   const renderMessage = ({ item }) => {
     if (!item || typeof item !== 'object') {
       console.error('Invalid message item:', item);
@@ -115,12 +107,27 @@ const MessageScreen = () => {
     );
   };
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (flatListRef.current && messages.length > 0) {
       flatListRef.current.scrollToEnd({ animated: true });
     }
   }, [messages]);
+
+  if (!recipientId) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          No recipient selected. Please choose a conversation.
+        </Text>
+        <TouchableOpacity
+          style={styles.goBackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.goBackButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -128,43 +135,28 @@ const MessageScreen = () => {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {recipientId ? (
-        <>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.messageList}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          />
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              placeholder="Type a message..."
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-              <Text style={styles.sendButtonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      ) : (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>
-            No recipient selected. Please go back and choose a conversation.
-          </Text>
-          <TouchableOpacity
-            style={styles.goBackButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.goBackButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        renderItem={renderMessage}
+        keyExtractor={(item, index) => (item.id ? item.id.toString() : `message-${index}`)}
+        contentContainerStyle={styles.messageList}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={newMessage}
+          onChangeText={setNewMessage}
+          placeholder="Type a message..."
+          placeholderTextColor="#999"
+          editable={!loading}
+        />
+        <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={loading}>
+          <Text style={styles.sendButtonText}>{loading ? 'Sending...' : 'Send'}</Text>
+        </TouchableOpacity>
+      </View>
     </KeyboardAvoidingView>
   );
 };

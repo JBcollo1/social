@@ -14,8 +14,7 @@ import Footer from "../services/footer";
 import MyProfileScreen from "../screens/myprofile";
 import MessageScreen from "../screens/message";
 import ConversationListScreen from "../screens/ConversationListScreen";
-import { useSelector, useDispatch } from 'react-redux';
-import { login } from '../redux/authSlice';
+import { useSelector } from 'react-redux';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -24,14 +23,12 @@ const MainTabs = () => (
   <Tab.Navigator tabBar={props => <Footer {...props} />}>
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Profile" component={MyProfileScreen} />
-    <Tab.Screen name="Messages" component={MessageScreen} />
-    <Tab.Screen name="ConversationList" component={ConversationListScreen} />
+    <Tab.Screen name="Messages" component={ConversationListScreen} />
   </Tab.Navigator>
 );
 
 const AppNavigator = () => {
     const isLoggedIn = useSelector(state => state.auth.isLoggedIn);
-    const dispatch = useDispatch();
 
     const defaultScreenOptions = {
         headerTitle: () => <Header />,
@@ -41,7 +38,7 @@ const AppNavigator = () => {
     return ( 
         <NavigationContainer>
             <Stack.Navigator 
-                initialRouteName={isLoggedIn ? "Main" : "Login"}
+                initialRouteName={isLoggedIn ? "MainTabs" : "Login"}
                 screenOptions={defaultScreenOptions}
             >
                 {!isLoggedIn ? (
@@ -52,10 +49,10 @@ const AppNavigator = () => {
                     </>
                 ) : (
                     <>
-                        <Stack.Screen name="Main" component={MainTabs} options={{headerShown: false}}/>
+                        <Stack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}}/>
                         <Stack.Screen name="Post" component={PostCreationScreen} />
                         <Stack.Screen 
-                            name="Messages" 
+                            name="MessageScreen" 
                             component={MessageScreen} 
                             options={({ navigation }) => ({
                                 headerLeft: () => (

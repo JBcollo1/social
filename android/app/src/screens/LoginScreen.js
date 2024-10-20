@@ -2,11 +2,14 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { login } from '../redux/authSlice';
 
 const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const dispatch = useDispatch();
     
     const handleLogin = async () => {
         setLoading(true);
@@ -25,7 +28,8 @@ const LoginScreen = ({ navigation }) => {
             if (response.ok) {
                 await AsyncStorage.setItem('access_token', data.access_token);
                 console.log("Login successful", data);
-                navigation.navigate("Main");
+                dispatch(login(data));
+                navigation.navigate("MainTabs");
             } else {
                 if (data.message === "User does not exist") {
                     navigation.navigate("Register");
