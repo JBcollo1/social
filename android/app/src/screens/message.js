@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -8,40 +8,62 @@ const MessageScreen = () => {
   const [newMessage, setNewMessage] = useState('');
   const navigation = useNavigation();
   const route = useRoute();
+  const flatListRef = useRef(null);
   
-  // Add a check for route.params
   const { recipientId, recipientName, currentUserId } = route.params || {};
 
+  if (!recipientId) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          No recipient selected. Please choose a conversation.
+        </Text>
+        <TouchableOpacity
+          style={styles.goBackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.goBackButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   useEffect(() => {
-    console.log('Route params:', route.params); // Add this line for debugging
+    console.log('Route params:', route.params);
     if (recipientId) {
       fetchConversation();
       const interval = setInterval(fetchConversation, 15000);
       return () => clearInterval(interval);
     } else {
-      // Handle the case when recipientId is not available
-      console.error('Missing recipientId'); // Add this line for debugging
-      Alert.alert('Error', 'Recipient information is missing');
-      navigation.goBack(); // Optionally navigate back
+      console.warn('Missing recipientId. Route params:', route.params);
+      Alert.alert(
+        'Error',
+        'Recipient information is missing. Please select a conversation.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     }
-  }, [recipientId]);
+  }, [recipientId, navigation, route.params]);
 
   // Fetch the conversation between the current user and recipient
   const fetchConversation = async () => {
-    if (!recipientId) return;
+    if (!recipientId) {
+      console.warn('Attempted to fetch conversation without recipientId');
+      return;
+    }
     try {
       const access_token = await AsyncStorage.getItem('access_token');
       const response = await fetch(`http://192.168.100.82:5000/conversation/${recipientId}`, {
         headers: { Authorization: `Bearer ${access_token}` },
       });
       const data = await response.json();
-      if (response.ok) {
-        setMessages(data.reverse()); // Show messages in the correct order
+      if (response.ok && Array.isArray(data)) {
+        setMessages(data);
       } else {
-        Alert.alert('Error', data.message || 'Failed to fetch messages');
+        throw new Error(data.message || 'Failed to fetch messages');
       }
     } catch (error) {
       console.error('Error fetching conversation:', error);
+      Alert.alert('Error', `Failed to fetch messages: ${error.message}`);
     }
   };
 
@@ -61,36 +83,44 @@ const MessageScreen = () => {
       const data = await response.json();
       if (response.ok) {
         setNewMessage('');
-        fetchConversation(); // Refresh the conversation after sending
+        setMessages(prevMessages => [...prevMessages, data]);
       } else {
-        Alert.alert('Error', data.message || 'Failed to send message');
+        throw new Error(data.message || 'Failed to send message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      Alert.alert('Error', error.message);
     }
   };
 
   // Render a single message bubble
   const renderMessage = ({ item }) => {
-    console.log('Rendering message:', item); // Add this line for debugging
     if (!item || typeof item !== 'object') {
       console.error('Invalid message item:', item);
       return null;
     }
+    const isSentMessage = item.sender_id === currentUserId;
     return (
       <View
         style={[
           styles.messageBubble,
-          item.sender === recipientName ? styles.receivedMessage : styles.sentMessage,
+          isSentMessage ? styles.sentMessage : styles.receivedMessage,
         ]}
       >
         <Text style={styles.messageText}>{item.content || 'No content'}</Text>
         <Text style={styles.timestamp}>
-          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'No timestamp'}
+          {item.created_at ? new Date(item.created_at).toLocaleTimeString() : 'No timestamp'}
         </Text>
       </View>
     );
   };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (flatListRef.current && messages.length > 0) {
+      flatListRef.current.scrollToEnd({ animated: true });
+    }
+  }, [messages]);
 
   return (
     <KeyboardAvoidingView
@@ -98,24 +128,43 @@ const MessageScreen = () => {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item, index) => index.toString()}
-        inverted // This will keep the newest messages at the bottom
-      />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Type a message..."
-          placeholderTextColor="#999"
-        />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Text style={styles.sendButtonText}>Send</Text>
-        </TouchableOpacity>
-      </View>
+      {recipientId ? (
+        <>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          />
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              value={newMessage}
+              onChangeText={setNewMessage}
+              placeholder="Type a message..."
+              placeholderTextColor="#999"
+            />
+            <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+              <Text style={styles.sendButtonText}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            No recipient selected. Please go back and choose a conversation.
+          </Text>
+          <TouchableOpacity
+            style={styles.goBackButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.goBackButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -124,6 +173,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  messageList: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingVertical: 10,
   },
   messageBubble: {
     maxWidth: '70%',
@@ -154,6 +208,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 10,
     backgroundColor: '#111',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
   },
   input: {
     flex: 1,
@@ -172,6 +228,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#fff',
+    textAlign: 'center',
+  },
+  goBackButton: {
+    backgroundColor: '#ee1d52',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  goBackButtonText: {
     color: '#fff',
     fontWeight: 'bold',
   },
