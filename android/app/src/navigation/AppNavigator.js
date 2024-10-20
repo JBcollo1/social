@@ -13,6 +13,9 @@ import PostCreationScreen from "../screens/PostCreationScreen";
 import Footer from "../services/footer";
 import MyProfileScreen from "../screens/myprofile";
 import MessageScreen from "../screens/message";
+import ConversationListScreen from "../screens/ConversationListScreen";
+import { useSelector, useDispatch } from 'react-redux';
+import { login } from '../redux/authSlice';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -22,10 +25,14 @@ const MainTabs = () => (
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Profile" component={MyProfileScreen} />
     <Tab.Screen name="Messages" component={MessageScreen} />
+    <Tab.Screen name="ConversationList" component={ConversationListScreen} />
   </Tab.Navigator>
 );
 
 const AppNavigator = () => {
+    const isLoggedIn = useSelector(state => state.auth.isLoggedIn);
+    const dispatch = useDispatch();
+
     const defaultScreenOptions = {
         headerTitle: () => <Header />,
         headerShown: true
@@ -34,25 +41,32 @@ const AppNavigator = () => {
     return ( 
         <NavigationContainer>
             <Stack.Navigator 
-                initialRouteName="Login"
+                initialRouteName={isLoggedIn ? "Main" : "Login"}
                 screenOptions={defaultScreenOptions}
             >
-                <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Register" component={RegisterScreen} />
-                <Stack.Screen name="Verification" component={VerificationScreen} />
-                <Stack.Screen name="Post" component={PostCreationScreen} />
-                <Stack.Screen name="Main" component={MainTabs} options={{headerShown: false}}/>
-                <Stack.Screen 
-                    name="Messages" 
-                    component={MessageScreen} 
-                    options={({ navigation }) => ({
-                        headerLeft: () => (
-                            <TouchableOpacity onPress={() => navigation.goBack()}>
-                                <Text style={{ color: 'black', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>Cancel</Text>
-                            </TouchableOpacity>
-                        )
-                    })}
-                />
+                {!isLoggedIn ? (
+                    <>
+                        <Stack.Screen name="Login" component={LoginScreen} />
+                        <Stack.Screen name="Register" component={RegisterScreen} />
+                        <Stack.Screen name="Verification" component={VerificationScreen} />
+                    </>
+                ) : (
+                    <>
+                        <Stack.Screen name="Main" component={MainTabs} options={{headerShown: false}}/>
+                        <Stack.Screen name="Post" component={PostCreationScreen} />
+                        <Stack.Screen 
+                            name="Messages" 
+                            component={MessageScreen} 
+                            options={({ navigation }) => ({
+                                headerLeft: () => (
+                                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                                        <Text style={{ color: 'black', fontSize: 16, fontWeight: 'bold', marginLeft: 10 }}>Cancel</Text>
+                                    </TouchableOpacity>
+                                )
+                            })}
+                        />
+                    </>
+                )}
             </Stack.Navigator>
         </NavigationContainer>
     );
