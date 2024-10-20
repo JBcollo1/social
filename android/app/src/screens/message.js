@@ -101,7 +101,7 @@ const MessageScreen = () => {
       >
         <Text style={styles.messageText}>{item.content || 'No content'}</Text>
         <Text style={styles.timestamp}>
-          {item.created_at ? new Date(item.created_at).toLocaleTimeString() : 'No timestamp'}
+          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'No timestamp'}
         </Text>
       </View>
     );
