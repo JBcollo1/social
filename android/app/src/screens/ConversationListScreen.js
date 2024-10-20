@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ConversationListScreen = () => {
   const [conversations, setConversations] = useState([]);
   const [users, setUsers] = useState([]);
+  const [activeTab, setActiveTab] = useState('conversations');
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -59,13 +60,22 @@ const ConversationListScreen = () => {
         recipientName: item.username,
       })}
     >
-      <View style={styles.conversationHeader}>
-        <Text style={styles.recipientName}>{item.username}</Text>
-        <Text style={styles.timestamp}>{new Date(item.timestamp).toLocaleString()}</Text>
+      <View style={styles.conversationContent}>
+        {item.picture && (
+          <Image source={{ uri: item.picture }} style={styles.profilePicture} />
+        )}
+        <View style={styles.conversationDetails}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.recipientName}>{item.username}</Text>
+            <Text style={styles.timestamp}>
+              {new Date(item.timestamp).toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+          <Text style={styles.lastMessage} numberOfLines={1} ellipsizeMode="tail">
+            {item.last_message}
+          </Text>
+        </View>
       </View>
-      <Text style={styles.lastMessage} numberOfLines={1} ellipsizeMode="tail">
-        {item.last_message}
-      </Text>
       {item.unread_count > 0 && (
         <View style={styles.unreadBadge}>
           <Text style={styles.unreadCount}>{item.unread_count}</Text>
@@ -91,20 +101,35 @@ const ConversationListScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Conversations</Text>
-      <FlatList
-        data={conversations}
-        renderItem={renderConversationItem}
-        keyExtractor={(item, index) => `conversation-${item.user_id || index}`}
-        style={styles.list}
-      />
-      <Text style={styles.sectionTitle}>All Users</Text>
-      <FlatList
-        data={users}
-        renderItem={renderUserItem}
-        keyExtractor={(item, index) => `user-${item.user_id || index}`}
-        style={styles.list}
-      />
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'conversations' && styles.activeTab]}
+          onPress={() => setActiveTab('conversations')}
+        >
+          <Text style={[styles.tabText, activeTab === 'conversations' && styles.activeTabText]}>Conversations</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+          onPress={() => setActiveTab('users')}
+        >
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>Users</Text>
+        </TouchableOpacity>
+      </View>
+      {activeTab === 'conversations' ? (
+        <FlatList
+          data={conversations}
+          renderItem={renderConversationItem}
+          keyExtractor={(item, index) => `conversation-${item.user_id || index}`}
+          style={styles.list}
+        />
+      ) : (
+        <FlatList
+          data={users}
+          renderItem={renderUserItem}
+          keyExtractor={(item, index) => `user-${item.user_id || index}`}
+          style={styles.list}
+        />
+      )}
     </View>
   );
 };
@@ -112,21 +137,48 @@ const ConversationListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#1a1a1a', // Lighter background color
   },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 20,
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#2a2a2a',
+    marginBottom: 10,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    color: '#999',
+    fontSize: 16,
     fontWeight: 'bold',
-    padding: 15,
+  },
+  activeTabText: {
+    color: '#fff',
   },
   list: {
     flex: 1,
   },
   conversationItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
+  },
+  conversationContent: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  conversationDetails: {
+    flex: 1,
+    marginLeft: 15,
   },
   recipientName: {
     color: '#fff',
@@ -148,15 +200,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   unreadBadge: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
     backgroundColor: '#007AFF',
     borderRadius: 10,
     width: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 10,
   },
   unreadCount: {
     color: '#FFF',
