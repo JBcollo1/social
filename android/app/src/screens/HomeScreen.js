@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image,A } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TouchableOpacity, Image, ScrollView } from 'react-native';
 import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native'; 
@@ -20,6 +20,8 @@ const HomeScreen = () => {
   const [profileExists, setProfileExists] = useState(true);
   const [hasNextPage, setHasNextPage] = useState(true);
   const [name, setName] = useState("");
+  const [expandedContent, setExpandedContent] = useState({});
+  const [conversations, setConversations] = useState([]);
 
   const navigation = useNavigation();
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
@@ -53,23 +55,36 @@ const HomeScreen = () => {
   const fetchProfile = async (userId) => {
     setLoading(true);
     try {
-      const response = await fetch(`http://192.168.100.82:5000/profile/${userId}`, {
+      const response = await fetch(`http://192.168.100.82:5000/users`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${await AsyncStorage.getItem('access_token')}`,
         },
       });
       if (!response.ok) {
-        setProfileExists(false);  
-        return;
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setProfilePicture({ uri: data.profile_picture });
-      setName(data.username);
-      setProfileExists(true);  
+      
+      // Check if data is an array and take the first item
+      const userData = Array.isArray(data) ? data[0] : data;
+
+      if (userData && userData.profile_picture) {
+        setProfilePicture( userData.profile_picture );
+        setName(userData.username);
+        setProfileExists(true);
+        console.log("Profile data:", userData);
+        console.log(profilePicture);
+        console.log(name);
+      } else {
+        throw new Error("Invalid user data received");
+      }
     } catch (error) {
+      console.error("Error fetching profile:", error);
       setProfileExists(false);
-      Alert.alert('Error', error.message || 'Failed to fetch profile.');
+      setProfilePicture(null);
+      setName("");
+      Alert.alert('Error', 'Failed to fetch profile. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -115,71 +130,126 @@ const HomeScreen = () => {
     setVideoPaused((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
+  // Fetch conversations
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const response = await fetch('http://192.168.100.82:5000/conversations', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${await AsyncStorage.getItem('access_token')}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch conversations');
+        }
+        const data = await response.json();
+        setConversations(data);
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      }
+    };
+
+    fetchConversations();
+  }, []);
+
+  const toggleContentExpansion = (postId) => {
+    setExpandedContent(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
+
   // Render each post
-  // In the renderPost function
-const renderPost = ({ item, index }) => {
-  const isPlaying = index === playingVideoIndex;
-  const paused = videoPaused[index] || !isPlaying;
+  const renderPost = ({ item, index }) => {
+    const isPlaying = index === playingVideoIndex;
+    const paused = videoPaused[index] || !isPlaying;
+    const isExpanded = expandedContent[item.id];
 
-  return (
-    <View style={styles.postContainer}>
-      <View style={styles.postHeader}>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
-          <Image
-            source={
-              profilePicture 
-                ? { uri: profilePicture.uri } 
-                : { uri: 'https://media.istockphoto.com/id/1263886253/photo/financial-graphic-on-a-high-tech-abstract-background.jpg?s=612x612&w=0&k=20&c=Ru7e67lWBzT4ifiKN8IPcCE_3WKmwRwVMpvj99GxXHg=' } 
-            }
-            style={styles.profilePicture}
-          />
-        </TouchableOpacity>
-        <Text style={styles.username}>{name || 'Unknown User'}</Text>
-      </View>
-
-      <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
-        {item.video_url ? (
-          <Video
-            source={{ uri: item.video_url }}
-            style={styles.video}
-            paused={paused}
-            repeat={true}
-            resizeMode="cover"
-            ignoreSilentSwitch="obey"
-            onError={() => console.error('Error loading video at index:', index)}
-          />
-        ) : item.photo_url ? (
-          <Image source={{ uri: item.photo_url }} style={styles.image} resizeMode="cover" />
-        ) : (
-          <Text style={styles.text}>No Video or Photo Available</Text>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.interactionRow}>
-        <LikeButton postId={item.id} />
-        <CommentSection postId={item.id} />
-      </View>
-      
-      <View style={styles.captionContainer}>
-        <View style={styles.captionProfilePictureContainer}>
-          <Image
-            source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/fancy.webp')}
-            style={styles.captionProfilePicture}
-          />
-        </View>
-        <Text style={styles.captionText}>
+    return (
+      <View style={styles.postContainer}>
+        <View style={styles.postHeader}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_id })}>
+            <Image
+              source={{ uri: item.profile_picture || 'https://example.com/default.jpg' }}
+              style={styles.profilePicture}
+            />
+          </TouchableOpacity>
           <Text style={styles.username}>{item.username || 'Unknown User'}</Text>
-          {item.content ? ` ${item.content}` : ' No caption available.'}
-        </Text>
+        </View>
+
+        <TouchableOpacity activeOpacity={1} onPress={() => handleVideoPress(index)}>
+          {item.video_url ? (
+            <Video
+              source={{ uri: item.video_url }}
+              style={styles.media}
+              paused={paused}
+              repeat={true}
+              resizeMode="cover"
+              ignoreSilentSwitch="obey"
+              onError={() => console.error('Error loading video at index:', index)}
+            />
+          ) : item.photo_url ? (
+            <Image source={{ uri: item.photo_url }} style={styles.media} resizeMode="cover" />
+          ) : (
+            <View style={styles.noMediaContainer}>
+              <Text style={styles.noMediaText}>No Media Available</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.interactionRow}>
+          <LikeButton postId={item.id} />
+          <CommentSection postId={item.id} />
+        </View>
+        
+        <View style={styles.captionContainer}>
+          <Text style={styles.captionText} numberOfLines={isExpanded ? undefined : 2}>
+            <Text style={styles.captionUsername}>{item.username || 'Unknown User'}</Text>
+            {item.content ? ` ${item.content}` : ' No caption available.'}
+          </Text>
+          {item.content && item.content.length > 100 && (
+            <TouchableOpacity onPress={() => toggleContentExpansion(item.id)}>
+              <Text style={styles.readMoreText}>{isExpanded ? 'Show less' : 'Read more'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
   return (
     <View style={styles.container}>
+      <ScrollView horizontal style={styles.conversationsContainer} showsHorizontalScrollIndicator={false}>
+        <TouchableOpacity 
+          style={styles.conversationItem}
+          onPress={() => navigation.navigate('Profile', { userId: userId })}
+        >
+          <Image 
+            source={{uri:profilePicture} || { uri: 'https://example.com/default.jpg' }} 
+            style={styles.conversationProfilePic} 
+          />
+        </TouchableOpacity>
+        {conversations.map(conv => (
+          <TouchableOpacity 
+            key={conv.id} 
+            style={styles.conversationItem}
+            onPress={() => navigation.navigate('Chat', { conversationId: conv.id, recipientName: conv.recipient_name })}
+          >
+            <Image 
+              source={{ uri: conv.recipient_profile_picture || 'https://example.com/default.jpg' }} 
+              style={styles.conversationProfilePic} 
+            />
+            {conv.unread_messages > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{conv.unread_messages}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
       {loading ? (
-        <ActivityIndicator size="large" color="#000" style={styles.loading} />
+        <ActivityIndicator size="large" color="#fff" style={styles.loading} />
       ) : (
         <FlatList
           data={posts}
@@ -190,9 +260,6 @@ const renderPost = ({ item, index }) => {
           snapToInterval={height}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
-          scrollEnabled={true}
-          contentContainerStyle={{ flexGrow: 1 }}
-          getItemLayout={(data, index) => ({ length: height, offset: height * index, index })}
           onEndReached={() => setPage((prevPage) => prevPage + 1)}
           onEndReachedThreshold={0.5}
           onViewableItemsChanged={onViewableItemsChanged}
@@ -203,17 +270,47 @@ const renderPost = ({ item, index }) => {
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#121212', // Darker background
+  },
+  conversationsContainer: {
+    height: 100,
+    backgroundColor: '#1e1e1e',
+    paddingVertical: 10,
+  },
+  conversationItem: {
+    marginHorizontal: 5,
+    position: 'relative',
+  },
+  conversationProfilePic: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#e1306c',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    backgroundColor: '#e1306c',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   postContainer: {
     width: width,
     height: height,
-    backgroundColor: '#fff',
-    marginBottom: 10,
+    backgroundColor: '#1e1e1e',
   },
   postHeader: {
     flexDirection: 'row',
@@ -226,81 +323,52 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: 10,
   },
-  captionProfilePictureContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginRight: 10,
-  },
-  captionProfilePicture: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  captionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  captionText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#000',
-  },
   username: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: '600',
+    color: '#ffffff',
   },
-  video: {
+  media: {
     width: width,
-    height: height * 0.6,
+    height: width,
+    backgroundColor: '#2c2c2c',
   },
-  image: {
+  noMediaContainer: {
     width: width,
-    height: height * 0.6,
+    height: width,
+    backgroundColor: '#2c2c2c',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noMediaText: {
+    fontSize: 16,
+    color: '#ffffff',
   },
   interactionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
     padding: 10,
   },
-  iconButton: {
-    marginRight: 20,
-  },
-  caption: {
+  captionContainer: {
     paddingHorizontal: 10,
-    color: '#000',
+    paddingBottom: 10,
   },
-  text: {
-    color: 'black',
-    fontSize: 16,
-    textAlign: 'center',
+  captionText: {
+    fontSize: 14,
+    color: '#ffffff',
+    lineHeight: 18,
+  },
+  captionUsername: {
+    fontWeight: '600',
+  },
+  readMoreText: {
+    color: '#8e8e8e',
+    marginTop: 5,
   },
   loading: {
-    position: 'absolute',
-    top: height / 2 - 20,
-    left: width / 2 - 20,
-  },
-  modalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    maxHeight: '80%',
-  },
-  commentContainer: {
-    paddingVertical: 10,
-  },
-
-  
 });
 
 export default HomeScreen;
