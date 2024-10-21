@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, FlatList, TextInput, TouchableOpacity, Text, StyleSheet, Modal, SafeAreaView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const CommentSection = ({ postId }) => {
   const [isCommentsVisible, setIsCommentsVisible] = useState(false);
@@ -53,9 +54,10 @@ const CommentSection = ({ postId }) => {
   };
 
   return (
-    <View>
-      <TouchableOpacity onPress={showComments}>
-        <Text style={styles.showCommentsButton}>Show Comments</Text>
+    <View style={styles.commentSectionContainer}>
+      <TouchableOpacity onPress={showComments} style={styles.showCommentsButton}>
+        <Icon name="chatbubble-outline" size={18} color="#333" style={styles.commentIcon} />
+        <Text style={styles.showCommentsText}>Show Comments</Text>
       </TouchableOpacity>
 
       <Modal visible={isCommentsVisible} animationType="slide" transparent={true}>
@@ -104,11 +106,31 @@ const CommentSection = ({ postId }) => {
 };
 
 const styles = StyleSheet.create({
-  showCommentsButton: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: 'bold',
+  commentSectionContainer: {
+    flexDirection: 'row',
     marginVertical: 10,
+    width: '100%',
+  },
+  showCommentsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: -14,
+    marginLeft: 150,
+  },
+  showCommentsText: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  commentIcon: {
+    marginRight: 5,
   },
   modalOverlay: {
     flex: 1,
