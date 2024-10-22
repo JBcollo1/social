@@ -8,6 +8,7 @@ const ConversationListScreen = () => {
   const [users, setUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('conversations');
   const navigation = useNavigation();
+  const [followStatus, setFollowStatus] = useState({});
 
   useEffect(() => {
     fetchConversations();
@@ -52,6 +53,56 @@ const ConversationListScreen = () => {
     }
   };
 
+  const toggleFollow = async (userId) => {
+    try {
+      const access_token = await AsyncStorage.getItem('access_token');
+      const isFollowing = followStatus[userId];
+      const url = isFollowing
+        ? `http://192.168.100.82:5000/unfollow/${userId}`
+        : `http://192.168.100.82:5000/follow/${userId}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setFollowStatus(prev => ({ ...prev, [userId]: !isFollowing }));
+        Alert.alert('Success', data.message);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      Alert.alert('Error', 'Failed to update follow status. Please try again.');
+    }
+  };
+
+  const fetchFollowStatus = async (userId) => {
+    try {
+      const access_token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`http://192.168.100.82:5000/follow-status/${userId}`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setFollowStatus(prev => ({ ...prev, [userId]: data.is_following }));
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching follow status:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      users.forEach(user => fetchFollowStatus(user.user_id));
+    }
+  }, [users, activeTab]);
+
   const renderConversationItem = ({ item }) => (
     <TouchableOpacity
       style={styles.conversationItem}
@@ -85,18 +136,28 @@ const ConversationListScreen = () => {
   );
 
   const renderUserItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.userItem}
-      onPress={() => navigation.navigate('MessageScreen', {
-        recipientId: item.user_id,
-        recipientName: item.username,
-      })}
-    >
-      {item.profile_picture && (
-        <Image source={{ uri: item.profile_picture }} style={styles.profilePicture} />
-      )}
-      <Text style={styles.username}>{item.username}</Text>
-    </TouchableOpacity>
+    <View style={styles.userItem}>
+      <TouchableOpacity
+        style={styles.userInfo}
+        onPress={() => navigation.navigate('MessageScreen', {
+          recipientId: item.user_id,
+          recipientName: item.username,
+        })}
+      >
+        {item.profile_picture && (
+          <Image source={{ uri: item.profile_picture }} style={styles.profilePicture} />
+        )}
+        <Text style={styles.username}>{item.username}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.followButton, followStatus[item.user_id] && styles.followingButton]}
+        onPress={() => toggleFollow(item.user_id)}
+      >
+        <Text style={styles.followButtonText}>
+          {followStatus[item.user_id] ? 'Unfollow' : 'Follow'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -216,9 +277,28 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  followButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  followingButton: {
+    backgroundColor: '#333',
+  },
+  followButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   profilePicture: {
     width: 50,

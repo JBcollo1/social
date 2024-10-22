@@ -3,11 +3,12 @@ import { View, Text, Image, StyleSheet, ScrollView, FlatList, TouchableOpacity, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Video from 'react-native-video';
 import {jwtDecode} from 'jwt-decode';
-
+import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
 const MyProfileScreen = () => {
+  const navigation = useNavigation();
   const [userData, setUserData] = useState(null);
   const [posts, setPosts] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
@@ -16,7 +17,9 @@ const MyProfileScreen = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [userId, setUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const videoRef = useRef(null); 
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -39,6 +42,8 @@ const MyProfileScreen = () => {
       fetchUserData();
       fetchUserPosts();
       fetchLikedPosts();
+      fetchFollowerCount();
+      fetchFollowingCount();
     }
   }, [userId]);
 
@@ -80,6 +85,36 @@ const MyProfileScreen = () => {
     } catch (error) {
       console.error('Error fetching liked posts:', error);
     }
+  };
+
+  const fetchFollowerCount = async () => {
+    try {
+      const access_token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`http://192.168.100.82:5000/follower-count/${userId}`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const data = await response.json();
+      setFollowerCount(data.count);
+    } catch (error) {
+      console.error('Error fetching follower count:', error);
+    }
+  };
+
+  const fetchFollowingCount = async () => {
+    try {
+      const access_token = await AsyncStorage.getItem('access_token');
+      const response = await fetch(`http://192.168.100.82:5000/following-count/${userId}`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const data = await response.json();
+      setFollowingCount(data.count);
+    } catch (error) {
+      console.error('Error fetching following count:', error);
+    }
+  };
+
+  const navigateToProfileDetails = () => {
+    navigation.navigate('Profile');
   };
 
   const renderPost = ({ item }) => {
@@ -177,12 +212,24 @@ const MyProfileScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.profileHeader}>
-        <Image
-          source={userData?.profile_picture ? { uri: userData.profile_picture } : require('../assets/fancy.webp')}
-          style={styles.profilePic}
-        />
+        <TouchableOpacity onPress={navigateToProfileDetails}>
+          <Image
+            source={userData?.profile_picture ? { uri: userData.profile_picture } : require('../assets/fancy.webp')}
+            style={styles.profilePic}
+          />
+        </TouchableOpacity>
         <Text style={styles.username}>{userData?.username}</Text>
         <Text style={styles.bio}>{userData?.bio}</Text>
+        <View style={styles.followContainer}>
+          <View style={styles.followItem}>
+            <Text style={styles.followCount}>{followerCount}</Text>
+            <Text style={styles.followLabel}>Followers</Text>
+          </View>
+          <View style={styles.followItem}>
+            <Text style={styles.followCount}>{followingCount}</Text>
+            <Text style={styles.followLabel}>Following</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.tabContainer}>
@@ -351,6 +398,24 @@ const styles = StyleSheet.create({
   playButtonText: {
     color: 'white',
     fontSize: 50,
+  },
+  followContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  followItem: {
+    alignItems: 'center',
+    marginHorizontal: 20,
+  },
+  followCount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ee1d52',
+  },
+  followLabel: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 
