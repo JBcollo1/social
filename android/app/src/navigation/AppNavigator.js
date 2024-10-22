@@ -51,7 +51,7 @@ const AppNavigator = () => {
                     <>
                         <Stack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}}/>
                         <Stack.Screen name="Post" component={PostCreationScreen} />
-                        <Stack.Screen name="Profile" component={ProfileScreen} />
+                        <Stack.Screen name="Profile-2" component={ProfileScreen} />
                         <Stack.Screen 
                             name="MessageScreen" 
                             component={MessageScreen} 

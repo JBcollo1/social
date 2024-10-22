@@ -114,7 +114,7 @@ const MyProfileScreen = () => {
   };
 
   const navigateToProfileDetails = () => {
-    navigation.navigate('Profile');
+    navigation.navigate('Profile-2');
   };
 
   const renderPost = ({ item }) => {
