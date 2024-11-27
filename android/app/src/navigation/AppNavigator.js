@@ -15,12 +15,15 @@ import MyProfileScreen from "../screens/myprofile";
 import MessageScreen from "../screens/message";
 import ConversationListScreen from "../screens/ConversationListScreen";
 import { useSelector } from 'react-redux';
+import Mal	 from "../screens/mal";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => (
   <Tab.Navigator tabBar={props => <Footer {...props} />}>
+    <Tab.Screen name="Mal" component={Mal} />
+
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Profile" component={MyProfileScreen} />
     <Tab.Screen name="Messages" component={ConversationListScreen} />
@@ -51,6 +54,7 @@ const AppNavigator = () => {
                     <>
                         <Stack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}}/>
                         <Stack.Screen name="Post" component={PostCreationScreen} />
+
                         <Stack.Screen name="Profile-2" component={ProfileScreen} />
                         <Stack.Screen 
                             name="MessageScreen" 
