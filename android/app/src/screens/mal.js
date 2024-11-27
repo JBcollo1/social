@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
-import { Button, Text, View } from 'react-native';
+import { View, Button, TextInput, Text } from 'react-native';
+import axios from 'axios';
 
-function MalwareComponent() {
-    const [isMalwareActive, setIsMalwareActive] = useState(false);
+const App = () => {
+  const [deviceId, setDeviceId] = useState('');
+  const [status, setStatus] = useState('');
 
-    const startMalware = () => {
-        // Initiate the malware process
-        setIsMalwareActive(true);
-        // Your malicious code or API call here...
-    };
+  const registerDevice = async () => {
+    try {
+      const response = await axios.post('http://your-flask-server-ip:5000/register_device', {
+        device_id: deviceId,
+      });
+      setStatus(response.data.message);
+    } catch (error) {
+      setStatus('Error registering device.');
+    }
+  };
 
-    return (
-        <View>
-            <Text>Welcome to the Secret Feature!</Text>
-            <Button onPress={startMalware} title="Start Scan" />
-            {isMalwareActive && <Text>Malware is running...</Text>}
-        </View>
-    );
-}
+  return (
+    <View style={{ padding: 20 }}>
+      <Text>Enter Device ID:</Text>
+      <TextInput
+        style={{ height: 40, borderColor: 'gray', borderWidth: 1, marginBottom: 10 }}
+        onChangeText={setDeviceId}
+        value={deviceId}
+      />
+      <Button title="Register Device" onPress={registerDevice} />
+      <Text>Status: {status}</Text>
+    </View>
+  );
+};
+
+export default App;
